@@ -1,0 +1,9 @@
+__pycache__
+*.png
+*.csv
+*.txt
+.env
+*.json
+*.gz
+*.pdf
+*.md

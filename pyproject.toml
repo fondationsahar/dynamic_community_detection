@@ -1,0 +1,30 @@
+[project]
+name = "dcd-lago"
+version = "1.0.1"
+description = "Python implementation of the LAGO method for dynamic community detection in temporal networks. Derived functions such as the Longitudinal Modularity are also provided."
+keywords = [
+    'lago',
+    'networks',
+    'temporal networks',
+    'modularity',
+    'longitudinal modularity',
+    'community detection',
+    'dynamic community detection',
+]
+authors = [
+    { name="Victor Brabant", email="victorbrabant@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+[project.urls]
+Homepage = "https://github.com/fondationsahar/dynamic_community_detection"
+Issues = "https://github.com/fondationsahar/dynamic_community_detection/issues"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["lago"]

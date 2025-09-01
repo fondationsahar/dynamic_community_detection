@@ -21,11 +21,11 @@ We call this task **Dynamic Community Detection**.
 <div style="text-align: center;">
 <img src="img/dcd_example.png" alt="Link Stream example with two dynamic communities" display:block; margin:auto;  width="500" /> 
 
-Figure 1: Link stream made up of 5 nodes (a, ...,e) with time interactions over time represented with vertical dashed lines. Two dynamic communities are displayed in blue and green.
+*Figure 1: Link stream made up of 5 nodes (a, ...,e) with time interactions over time represented with vertical dashed lines. Two dynamic communities are displayed in blue and green.*
 
 </div>
 
-**LAGO** is a method to detect dynamic communities on link streams which is inspired from most used community detection methods on static graphs. It is based on the greedy optimization of the Longitudinal Modularity, an adaptation of the Modularity quality function for communities on static networks.
+**LAGO** (Longitudinal Agglomerative Greedy Optimization) is a method to detect dynamic communities on link streams which is inspired from most used community detection methods on static graphs. It is based on the greedy optimization of the Longitudinal Modularity, an adaptation of the Modularity quality function for communities on static networks.
 
 ## Usage 
 
@@ -145,8 +145,8 @@ LAGO method and the python library are constantly improving. If you have any que
 ## References
 
 ### LAGO Method
-Preprint comming soon.
 
+*Preprint comming soon.*
 
 ### Longitudinal Modularity
 

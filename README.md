@@ -144,9 +144,20 @@ LAGO method and the python library are constantly improving. If you have any que
 
 ## References
 
-### LAGO Method
+### LAGO Method 
 
-*Preprint comming soon.*
+[*Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity*](https://arxiv.org/abs/2510.00741) *(preprint)*
+```
+@misc{brabant2025discoveringcommunitiescontinuoustimetemporal,
+      title={Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity}, 
+      author={Victor Brabant and Angela Bonifati and Rémy Cazabet},
+      year={2025},
+      eprint={2510.00741},
+      archivePrefix={arXiv},
+      primaryClass={cs.SI},
+      url={https://arxiv.org/abs/2510.00741}, 
+}
+```
 
 ### Longitudinal Modularity
 

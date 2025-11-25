@@ -191,29 +191,13 @@ def _get_communities_cmes(
                 coexistence = len(source_times & target_times)
                 if not coexistence:
                     continue
-                if linkstream.is_stream_graph:
-                    expected_value = (
-                        2 ** (source != target)
-                        * linkstream.degrees.get(source, 0)
-                        * linkstream.degrees.get(target, 0)
-                        * (
-                            coexistence
-                            / (
-                                linkstream.nodes_durations[source]
-                                * linkstream.nodes_durations[target]
-                            )
-                            ** 0.5
-                        )
-                        / (2 * linkstream.weight) ** 2
-                    )
-                else:
-                    expected_value = (
-                        2 ** (source != target)
-                        * linkstream.degrees.get(source, 0)
-                        * linkstream.degrees.get(target, 0)
-                        * (coexistence / linkstream.network_duration)
-                        / (2 * linkstream.weight) ** 2
-                    )
+                expected_value = (
+                    2 ** (source != target)
+                    * linkstream.degrees.get(source, 0)
+                    * linkstream.degrees.get(target, 0)
+                    * (coexistence / linkstream.network_duration)
+                    / (2 * linkstream.weight) ** 2
+                )
                 expectation += expected_value
         communities_expectations[commu] = expectation
 

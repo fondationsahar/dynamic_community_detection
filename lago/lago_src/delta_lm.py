@@ -43,7 +43,7 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: Δ L-Modularity of the movement
         """
-        nb_edges_diff = self._get_nb_edges_diff(M0_leaves, Mx_leaves)
+        weight_diff = self._get_weight_diff(M0_leaves, Mx_leaves)
 
         if self.lex == "MM":
             expectation_diff = self._get_expectation_mm_part(M0_leaves, Mx_leaves)
@@ -54,11 +54,11 @@ class DeltaLongitudinalModularityComputer:
 
         csc_diff = self._get_csc_diff(M0_time_segments, Mx_leaves)
 
-        delta_lm = nb_edges_diff - expectation_diff + csc_diff
+        delta_lm = weight_diff - expectation_diff + csc_diff
 
         return delta_lm
 
-    def _get_nb_edges_diff(self, M0_leaves: set[Leaf], Mx_leaves: set[Leaf]):
+    def _get_weight_diff(self, M0_leaves: set[Leaf], Mx_leaves: set[Leaf]):
         """Compute delta number of edges within module Mx if M0 joins Mx.
 
         Args:
@@ -70,11 +70,16 @@ class DeltaLongitudinalModularityComputer:
         """
         all_neighbs = list()
         for leaf in Mx_leaves:
-            all_neighbs += list(leaf.topo_neighbors)
+            all_neighbs += list(
+                [neighb for neighb in leaf.topo_neighbors | leaf.topo_neighbors_from]
+            )
         # Only keep inventoried neighbors that are in M0
         # NOTE cannot use a set here because we want to keep duplicated time nodes
-        neighbors = [neighb for neighb in all_neighbs if neighb in M0_leaves]
-        return len(neighbors)
+        neighbors_weights = [
+            neighb.weight for neighb in all_neighbs if neighb.target in M0_leaves
+        ]
+
+        return sum(neighbors_weights)
 
     def _get_csc_diff(self, M0_time_segments, Mx_leaves) -> float:
         """Compute the delta CSCs (Community Switches Counts)
@@ -129,15 +134,23 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: delta value for expected number of edges
         """
-        degree_Cx = self._sum_degrees(Mx_leaves)
         duration_Cx = tls.get_module_duration(Mx_leaves)
-
-        degree_Cx_U_C0 = self._sum_degrees(Mx_leaves | M0_leaves)
         duration_Cx_U_C0 = tls.get_module_duration(Mx_leaves | M0_leaves)
-
-        expectation_diff = (
-            degree_Cx_U_C0**2 * duration_Cx_U_C0 - degree_Cx**2 * duration_Cx
-        ) / (4 * self.linkstream.nb_edges * self.linkstream.network_duration)
+        if self.linkstream.directed:
+            degree_in_Cx = self._sum_degrees_in(Mx_leaves)
+            degree_in_Cx_U_C0 = self._sum_degrees_in(Mx_leaves | M0_leaves)
+            degree_out_Cx = self._sum_degrees_out(Mx_leaves)
+            degree_out_Cx_U_C0 = self._sum_degrees_out(Mx_leaves | M0_leaves)
+            expectation_diff = (
+                degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
+                - degree_in_Cx * degree_out_Cx * duration_Cx
+            ) / (4 * self.linkstream.weight * self.linkstream.network_duration)
+        else:
+            degree_Cx = self._sum_degrees(Mx_leaves)
+            degree_Cx_U_C0 = self._sum_degrees(Mx_leaves | M0_leaves)
+            expectation_diff = (
+                degree_Cx_U_C0**2 * duration_Cx_U_C0 - degree_Cx**2 * duration_Cx
+            ) / (4 * self.linkstream.weight * self.linkstream.network_duration)
 
         return expectation_diff
 
@@ -206,31 +219,56 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: expected number of edges between node1 and node2.
         """
-        numerator: float = (
-            2 ** (node1 != node2)
-            * self.linkstream.degrees[node1]
-            * self.linkstream.degrees[node2]
-            * (
-                nodes_durations["Cx_U_C0"][node1] ** 0.5
-                * nodes_durations["Cx_U_C0"][node2] ** 0.5
-                - nodes_durations["raw_Cx"][node1] ** 0.5
-                * nodes_durations["raw_Cx"][node2] ** 0.5
+        if self.linkstream.directed:
+            degrees_part = self.linkstream.degrees_in.get(
+                node1, 0
+            ) * self.linkstream.degrees_out.get(
+                node2, 0
+            ) + self.linkstream.degrees_out.get(
+                node1, 0
+            ) * self.linkstream.degrees_in.get(node2, 0)
+            if node1 == node2:  # NOTE Double check that
+                degrees_part /= 2
+        else:
+            degrees_part = (
+                2 ** (node1 != node2)
+                * self.linkstream.degrees[node1]
+                * self.linkstream.degrees[node2]
             )
+
+        numerator: float = degrees_part * (
+            nodes_durations["Cx_U_C0"][node1] ** 0.5
+            * nodes_durations["Cx_U_C0"][node2] ** 0.5
+            - nodes_durations["raw_Cx"][node1] ** 0.5
+            * nodes_durations["raw_Cx"][node2] ** 0.5
         )
 
-        if self.linkstream.is_stream_graph:
-            denominator: float = (
-                4
-                * self.linkstream.nb_edges
-                * (
-                    self.linkstream.nodes_durations[node1]
-                    * self.linkstream.nodes_durations[node2]
-                )
-                ** 0.5
-            )
-        else:
-            denominator = (
-                4 * self.linkstream.nb_edges * self.linkstream.network_duration
-            )
+        denominator = 4 * self.linkstream.weight * self.linkstream.network_duration
 
         return numerator / denominator
+
+    def _sum_degrees_in(self, module_leaves) -> float:
+        """Compute the sum of the degrees of nodes involved in the set of time nodes.
+
+        Args:
+            module_leaves (set): module time nodes
+
+        Returns:
+            float: sum of the nodes degrees
+        """
+        nodes = set([leaf.node for leaf in module_leaves])
+        degrees = {node: self.linkstream.degrees_in.get(node, 0) for node in nodes}
+        return sum(degrees.values())
+
+    def _sum_degrees_out(self, module_leaves) -> float:
+        """Compute the sum of the degrees of nodes involved in the set of time nodes.
+
+        Args:
+            module_leaves (set): module time nodes
+
+        Returns:
+            float: sum of the nodes degrees
+        """
+        nodes = set([leaf.node for leaf in module_leaves])
+        degrees = {node: self.linkstream.degrees_out.get(node, 0) for node in nodes}
+        return sum(degrees.values())

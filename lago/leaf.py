@@ -13,15 +13,21 @@ class Leaf:
 
         self.left_time_active_neighbor: Leaf | None = None
         self.right_time_active_neighbor: Leaf | None = None
+
+        # Neighbors self -> other (standard for undirected)
         self.topo_neighbors = set()
+        # Neighbors other -> self
+        self.topo_neighbors_from: set = set()
 
         self.module: Module | None = None
 
     @property
     def neighbors(self) -> set:
-        neighbors = (
-            set([self.left_time_active_neighbor, self.right_time_active_neighbor])
-            | self.topo_neighbors
+        neighbors = set(
+            [self.left_time_active_neighbor, self.right_time_active_neighbor]
+        )
+        neighbors |= set(
+            [neighb.target for neighb in self.topo_neighbors | self.topo_neighbors_from]
         )
         if None in neighbors:
             neighbors.remove(None)

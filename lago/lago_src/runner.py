@@ -63,7 +63,7 @@ def lago_run(
             time_module_mover,
             refiner,
             verbose,
-            linkstream.nb_edges,
+            linkstream.weight,
         )
 
     else:
@@ -71,7 +71,7 @@ def lago_run(
             time_module_mover,
             refiner,
             verbose,
-            linkstream.nb_edges,
+            linkstream.weight,
         )
 
 

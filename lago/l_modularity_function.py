@@ -60,13 +60,13 @@ def longitudinal_modularity(
 
     ### 3 - Time penalty
     cscs = get_community_switch_counts(linkstream)
-    time_penalty = -omega / (2 * linkstream.nb_edges) * cscs
+    time_penalty = -omega / (2 * linkstream.weight) * cscs
 
     ### 4 - Aggregation
     lm_modularity = 0
     for community, expectation in communities_expectations.items():
         nb_links = communities_nb_interactions[community]
-        lm_modularity += nb_links / (2 * linkstream.nb_edges) - expectation
+        lm_modularity += nb_links / (2 * linkstream.weight) - expectation
 
     lm_modularity += time_penalty
 
@@ -94,11 +94,13 @@ def _get_communities_nb_interactions(
         community = tmp_leaf.module
         if community not in communities_nb_interactions:
             communities_nb_interactions[community] = 0
-        neighbors = tmp_leaf.topo_neighbors
+        neighbors = tmp_leaf.topo_neighbors | tmp_leaf.topo_neighbors_from
         for neighbor in neighbors:
-            if neighbor.module != community:
+            if neighbor.target.module != community:
                 continue
-            communities_nb_interactions[community] += 2 ** (neighbor == tmp_leaf)
+            communities_nb_interactions[community] += (
+                2 ** (neighbor == tmp_leaf) * neighbor.weight
+            )
 
     return communities_nb_interactions
 
@@ -119,7 +121,7 @@ def _get_communities_jmes(
                 * linkstream.degrees.get(source, 0)
                 * linkstream.degrees.get(target, 0)
                 * (community_duration / linkstream.network_duration)
-                / (2 * linkstream.nb_edges) ** 2
+                / (2 * linkstream.weight) ** 2
             )
 
             expectation += expected_value
@@ -144,32 +146,27 @@ def _get_communities_mmes(
             geo_mean = (
                 nodes_durations.get(source, 0) * nodes_durations.get(target, 0)
             ) ** 0.5
-            if linkstream.is_stream_graph:
-                expected_value = (
-                    2 ** (source != target)
-                    * linkstream.degrees.get(source, 0)
-                    * linkstream.degrees.get(target, 0)
-                    * (
-                        geo_mean
-                        / (
-                            linkstream.nodes_durations[source]
-                            * linkstream.nodes_durations[target]
-                        )
-                        ** 0.5
-                    )
-                    / (2 * linkstream.nb_edges) ** 2
-                )
-                # print(source, nodes_durations.get(source, 0), linkstream.nodes_durations[source])
-                # print(target, nodes_durations.get(target, 0), linkstream.nodes_durations[target])
-                # input()
+
+            if linkstream.directed:
+                degrees_part = linkstream.degrees_in.get(
+                    source, 0
+                ) * linkstream.degrees_out.get(target, 0) + linkstream.degrees_out.get(
+                    source, 0
+                ) * linkstream.degrees_in.get(target, 0)
+                if source == target:  # NOTE Double check that
+                    degrees_part /= 2
             else:
-                expected_value = (
+                degrees_part = (
                     2 ** (source != target)
-                    * linkstream.degrees.get(source, 0)
-                    * linkstream.degrees.get(target, 0)
-                    * (geo_mean / linkstream.network_duration)
-                    / (2 * linkstream.nb_edges) ** 2
+                    * linkstream.degrees[source]
+                    * linkstream.degrees[target]
                 )
+
+            expected_value = (
+                degrees_part
+                * (geo_mean / linkstream.network_duration)
+                / (2 * linkstream.weight) ** 2
+            )
 
             expectation += expected_value
 
@@ -207,7 +204,7 @@ def _get_communities_cmes(
                             )
                             ** 0.5
                         )
-                        / (2 * linkstream.nb_edges) ** 2
+                        / (2 * linkstream.weight) ** 2
                     )
                 else:
                     expected_value = (
@@ -215,7 +212,7 @@ def _get_communities_cmes(
                         * linkstream.degrees.get(source, 0)
                         * linkstream.degrees.get(target, 0)
                         * (coexistence / linkstream.network_duration)
-                        / (2 * linkstream.nb_edges) ** 2
+                        / (2 * linkstream.weight) ** 2
                     )
                 expectation += expected_value
         communities_expectations[commu] = expectation

@@ -10,13 +10,11 @@ from lago.leaf import Leaf
 class LinkStream:
     def __init__(
         self,
-        is_stream_graph: bool = False,
-    ):
+    ) -> None:
         self.nodes = set[int]()
         self.degrees: dict[int, float] = {}
         self.min_time = sys.maxsize
         self.max_time = -sys.maxsize
-        self.is_stream_graph = is_stream_graph
 
         self.leaves_dict: dict[tuple[int, int], Leaf] = {}
         self.nodes_durations: dict[int, float] = {}
@@ -55,16 +53,7 @@ class LinkStream:
                 self.leaves_dict[(source, time)]
             )
 
-        if self.is_stream_graph:
-            # Compute nodes durations of existence
-            # NOTE This is a naive way, existences are just trimmed at left and right extremities.
-            # One should allow the user to custom the phases of existence
-            self.nodes_durations = {
-                node: existence[1] - existence[0] + 1
-                for node, existence in tmp_nodes_durations.items()
-            }
-        else:
-            self.nodes_durations = {}
+        self.nodes_durations = {}
 
         self.network_duration = self.max_time - self.min_time + 1
 

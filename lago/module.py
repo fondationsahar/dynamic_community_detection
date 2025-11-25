@@ -16,7 +16,7 @@ class Module:
         leaves_neighbors = set()
         for leaf in self.leaves:
             leaves_neighbors |= set(
-                [tmp_neighbor for tmp_neighbor in leaf.topo_neighbors]
+                [tmp_neighbor.target for tmp_neighbor in leaf.topo_neighbors]
             )
             right_time_neighb = leaf.right_time_active_neighbor
             if right_time_neighb is not None:

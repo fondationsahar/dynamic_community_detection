@@ -87,14 +87,6 @@ class LinkStream:
                     TimeEdge(self.leaves_dict[(source, time)], weight)
                 )
 
-            # Increment topological neighbors
-            self.leaves_dict[(source, time)].topo_neighbors.add(
-                self.leaves_dict[(target, time)]
-            )
-            self.leaves_dict[(target, time)].topo_neighbors.add(
-                self.leaves_dict[(source, time)]
-            )
-
         self.nodes_durations = {}
 
         self.network_duration = self.max_time - self.min_time + 1
@@ -126,16 +118,33 @@ class LinkStream:
                 time_links.add((fsource, ftarget, time))
         return time_links
 
+    def read_txt(self, path: str, columns_order=["source", "target", "time"]) -> None:
+        order_mapping = {col: val for val, col in enumerate(columns_order)}
+        with open(path, "r") as file:
+            # must respect source target time weight (type (for k-partite networks) -> directly in nodes declarations)
+            # If weight is not here, set it up to 1.
+            links = []
+            for rline in file:
+                elements = rline.strip().split()
+                weight = 1
+                if "weight" in columns_order:
+                    weight = elements[order_mapping["weight"]]
+                nline = [
+                    int(elements[order_mapping["source"]]),
+                    int(elements[order_mapping["target"]]),
+                    int(elements[order_mapping["time"]]),
+                    float(weight),
+                ]
+
+                links.append(nline)
+            # links = [tuple(map(int, line.strip().split())) for line in file]
+        self.add_links(links)
+
     def to_txt(self, path: str) -> None:
         with open(path, "w") as file:
             for triplet in self.get_time_links():
                 line = " ".join(map(str, triplet))
                 file.write(line + "\n")
-
-    def read_txt(self, path: str) -> None:
-        with open(path, "r") as file:
-            links = [tuple(map(int, line.strip().split())) for line in file]
-        self.add_links(links)
 
     @property
     def nb_timesteps(self) -> int:

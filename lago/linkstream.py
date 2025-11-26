@@ -33,7 +33,7 @@ class LinkStream:
     def add_links(self, links: List[tuple[int, ...]]):
         # NOTE times must be ints such that pgcd of all times is 1
         # Maybe add a specific step to normalize it ? With a specific option ?
-        tmp_nodes_durations: dict[int, List[int]] = {}
+        # tmp_nodes_durations: dict[int, List[int]] = {}
         for source, target, time, weight in links:
             self.nb_edges += 1
             self.weight += weight
@@ -42,14 +42,14 @@ class LinkStream:
             for node in [source, target]:
                 self.nodes.add(node)
 
-                if node not in tmp_nodes_durations:
-                    tmp_nodes_durations[node] = [time, time]
+                # if node not in tmp_nodes_durations:
+                #     tmp_nodes_durations[node] = [time, time]
 
-                else:
-                    tmp_nodes_durations[node] = [
-                        min(tmp_nodes_durations[node][0], time),
-                        max(tmp_nodes_durations[node][1], time),
-                    ]
+                # else:
+                #     tmp_nodes_durations[node] = [
+                #         min(tmp_nodes_durations[node][0], time),
+                #         max(tmp_nodes_durations[node][1], time),
+                #     ]
 
                 if (node, time) not in self.leaves_dict:
                     self.leaves_dict[(node, time)] = Leaf(

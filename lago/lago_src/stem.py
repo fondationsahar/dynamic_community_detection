@@ -64,6 +64,7 @@ class SingleTimeEdgeMover:
                 best_module, delta_lm = find_best_module_for_submodule(
                     self.delta_lm_computer,
                     child_module,
+                    self.linkstream.partite_mapping,
                     neighbors_modules,
                 )
 

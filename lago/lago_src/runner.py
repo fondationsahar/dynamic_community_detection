@@ -18,8 +18,8 @@ def lago_run(
     fast_exploration: bool,
     refinement_in: bool,
     verbose: bool,
-    stopping_criterion: float = 1e-6,
-    ndigits_logs: int = 10,
+    stopping_criterion: float,
+    ndigits_logs: int,
 ):
     """Apply LAGO once.
     Args:
@@ -99,6 +99,7 @@ def _init_movers(
         fast_exploration,
         modules,
         lm_computer,
+        linkstream.partite_mapping,
     )
 
     refiner = None

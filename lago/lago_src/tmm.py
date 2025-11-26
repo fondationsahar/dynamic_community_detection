@@ -16,10 +16,12 @@ class TimeModuleMover:
         fast_exploration: bool,
         modules: set[Module],
         delta_lm_computer: DeltaLongitudinalModularityComputer,
+        partite_mapping: dict[int, int],
     ) -> None:
         self.fast_exploration = fast_exploration
         self.modules = modules
         self.delta_lm_computer = delta_lm_computer
+        self.partite_mapping = partite_mapping
 
     def run(self) -> float:
         """Optimize one level of Recursive Time Module Mover.
@@ -47,7 +49,9 @@ class TimeModuleMover:
                 child_module = tmp_leaves_modules.pop()
 
                 best_module, delta_lm = find_best_module_for_submodule(
-                    self.delta_lm_computer, child_module
+                    self.delta_lm_computer,
+                    child_module,
+                    self.partite_mapping,
                 )
 
                 if not best_module or not delta_lm or not child_module.parent:

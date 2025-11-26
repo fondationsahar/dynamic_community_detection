@@ -10,6 +10,7 @@ from lago.module import Module
 def find_best_module_for_submodule(
     delta_lm_computer: DeltaLongitudinalModularityComputer,
     submodule: Module,
+    partite_mapping: dict[int, int] = {},
     modules: List[Module] | None = None,
 ):
     """Find best module to move the submodule to.
@@ -57,6 +58,7 @@ def find_best_module_for_submodule(
         M0_leaves=M0_leaves,
         M0_time_segments=M0_time_segments,
         Mx_leaves=M1_leaves,
+        partite_mapping=partite_mapping,
     )
 
     candidates_delta_lm: dict[Module, float] = {}
@@ -71,6 +73,7 @@ def find_best_module_for_submodule(
             M0_leaves=M0_leaves,
             M0_time_segments=M0_time_segments,
             Mx_leaves=M2_leaves,
+            partite_mapping=partite_mapping,
         )
 
         candidates_delta_lm[module] = delta_lm_M0_leaving_M1 + delta_lm_M0_joining_M2

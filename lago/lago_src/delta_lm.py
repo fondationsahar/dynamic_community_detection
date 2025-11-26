@@ -27,6 +27,7 @@ class DeltaLongitudinalModularityComputer:
         M0_leaves: set[Leaf],
         M0_time_segments: dict[int, List[List[Leaf]]],
         Mx_leaves: set[Leaf],
+        partite_mapping: dict[int, int],
     ):
         """Compute Δ L-Modularity of submodule M0 joining module Mx.
             L-Modularity is made up of three terms, each computed in a dedicated function:
@@ -46,9 +47,17 @@ class DeltaLongitudinalModularityComputer:
         weight_diff = self._get_weight_diff(M0_leaves, Mx_leaves)
 
         if self.lex == "MM":
-            expectation_diff = self._get_expectation_mm_part(M0_leaves, Mx_leaves)
+            expectation_diff = self._get_expectation_mm_part(
+                M0_leaves,
+                Mx_leaves,
+                partite_mapping,
+            )
         elif self.lex == "JM":
-            expectation_diff = self._get_expectation_jm_part(M0_leaves, Mx_leaves)
+            expectation_diff = self._get_expectation_jm_part(
+                M0_leaves,
+                Mx_leaves,
+                partite_mapping,
+            )
         else:
             raise Exception("Wrong lex value")
 
@@ -123,6 +132,7 @@ class DeltaLongitudinalModularityComputer:
         self,
         M0_leaves: set[Leaf],
         Mx_leaves: set[Leaf],
+        partite_mapping: dict[int, int],
     ):
         """Compute the delta number of expected edges within module Mx
         if joined by submodule M0, regarding the Joint-Membership expectation.
@@ -134,6 +144,10 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: delta value for expected number of edges
         """
+
+        # TODO Must include the kpartite version
+        # Not implemented yet
+
         duration_Cx = tls.get_module_duration(Mx_leaves)
         duration_Cx_U_C0 = tls.get_module_duration(Mx_leaves | M0_leaves)
         if self.linkstream.directed:
@@ -171,6 +185,7 @@ class DeltaLongitudinalModularityComputer:
         self,
         M0_leaves: set[Leaf],
         Mx_leaves: set[Leaf],
+        partite_mapping: dict[int, int],
     ):
         """Compute the delta number of expected edges within module Mx
         if joined by submodule M0, regarding the Mean-Membership expectation.
@@ -197,7 +212,7 @@ class DeltaLongitudinalModularityComputer:
         all_nodes = set([leaf.node for leaf in M0_leaves | Mx_leaves])
         for node1, node2 in combinations_with_replacement(all_nodes, 2):
             expectation_diff += self._partial_expectation_mm_diff(
-                node1, node2, nodes_durations
+                node1, node2, nodes_durations, partite_mapping
             )
 
         return expectation_diff
@@ -207,6 +222,7 @@ class DeltaLongitudinalModularityComputer:
         node1: int,
         node2: int,
         nodes_durations: dict[str, defaultdict[int, float]],
+        partite_mapping: dict[int, int],
     ):
         """Compute the delta expectation number of edges between node1 and node2,
         regarding the Mean-Membership expectation.
@@ -219,6 +235,11 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: expected number of edges between node1 and node2.
         """
+
+        # In k-partite networks, only interactions between different partites are expected
+        if partite_mapping.get(node1, -1) == partite_mapping.get(node1, -2):
+            return 0
+
         if self.linkstream.directed:
             degrees_part = self.linkstream.degrees_in.get(
                 node1, 0

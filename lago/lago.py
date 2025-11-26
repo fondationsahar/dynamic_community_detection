@@ -15,6 +15,8 @@ def lago_communities(
     fast_exploration: bool = True,
     refinement_in: bool = True,
     verbose: bool = False,
+    stopping_criterion: float = 1e-8,
+    ndigits_logs: int = 8,
 ):
     """LAGO (Longitudinal Agglomerative Greedy Optimization) is a method for uncovering
         dynamic communities on link streams by optimizating L-Modularity.
@@ -73,6 +75,8 @@ def lago_communities(
             fast_exploration,
             refinement_in,
             verbose,
+            stopping_criterion,
+            ndigits_logs,
         )
         if tmp_relative_lm < relative_lm:
             continue

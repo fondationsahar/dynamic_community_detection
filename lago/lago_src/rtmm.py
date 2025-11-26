@@ -5,6 +5,8 @@ def rtmm_optimization(
     time_module_mover: TimeModuleMover,
     verbose: bool,
     nb_edges: float,
+    stopping_criterion: float = 1e-6,
+    ndigits_logs: int = 10,
 ) -> float:
     """Core vanilla loop for optimizing L-Modularity (Recursive Time Module Movements).
         For each optimization level, modules are moved to their neighbors if it
@@ -15,17 +17,18 @@ def rtmm_optimization(
     Returns:
         float: Δ L-Modularity between initial state and final state.
     """
+
     delta_longitudinal_modularity = 0
     improvement = True
     level = 0
     while improvement:
         tmp_delta_longitudinal_modularity = time_module_mover.run()
-        improvement = tmp_delta_longitudinal_modularity > 0
+        improvement = tmp_delta_longitudinal_modularity > stopping_criterion * nb_edges
         delta_longitudinal_modularity += tmp_delta_longitudinal_modularity
 
         if verbose and improvement:
             print(
-                f"\tOptimized level {level} :: Δ L-Modularity = {round(tmp_delta_longitudinal_modularity / nb_edges, ndigits=5)}"
+                f"\tOptimized level {level} :: Δ L-Modularity = {round(tmp_delta_longitudinal_modularity / nb_edges, ndigits=ndigits_logs)}"
             )
 
         level += 1

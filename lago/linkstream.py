@@ -6,6 +6,7 @@ from lago.time_edge import TimeEdge
 
 # NOTE Add a function to preprocess time scale:
 # min should be 0 and min step should be 1 (use pgcd etc.)
+# TODO Add a threshold for convergence to avoid misleading floating issues (especially in weighted networks)
 
 
 class LinkStream:

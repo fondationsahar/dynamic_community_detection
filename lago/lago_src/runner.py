@@ -18,6 +18,8 @@ def lago_run(
     fast_exploration: bool,
     refinement_in: bool,
     verbose: bool,
+    stopping_criterion: float = 1e-6,
+    ndigits_logs: int = 10,
 ):
     """Apply LAGO once.
     Args:
@@ -64,6 +66,8 @@ def lago_run(
             refiner,
             verbose,
             linkstream.weight,
+            stopping_criterion,
+            ndigits_logs,
         )
 
     else:
@@ -72,6 +76,8 @@ def lago_run(
             refiner,
             verbose,
             linkstream.weight,
+            stopping_criterion,
+            ndigits_logs,
         )
 
 

@@ -101,7 +101,7 @@ class SingleTimeEdgeMover:
             stem_iterator.add((leaf, leaf))
             # Add all topological neighbors
             for topo_neighbor in leaf.topo_neighbors:
-                tmp_edge = [leaf, topo_neighbor]
+                tmp_edge = [leaf, topo_neighbor.target]
                 # Sort to avoid duplicates
                 tmp_edge.sort(key=id)
                 stem_iterator.add(tuple(tmp_edge))

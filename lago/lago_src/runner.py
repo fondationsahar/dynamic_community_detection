@@ -109,6 +109,7 @@ def _init_movers(
             fast_exploration,
             modules,
             lm_computer,
+            linkstream.partite_mapping,
         )
 
     elif refinement == "STEM":

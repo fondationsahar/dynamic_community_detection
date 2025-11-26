@@ -49,6 +49,10 @@ class SingleTimeEdgeMover:
                 # Only move edges that are inside the same module
                 # Condition must remain here because tmp_edges may overlap
                 # and time node may change affiliation during the exploration loop
+                # for tedg in child_edge:
+                #     if type(tedg) is not Leaf:
+                #         print(tedg)
+                #         print(tedg.target)
                 if child_edge[0].module != child_edge[1].module:
                     continue
 
@@ -137,7 +141,7 @@ class SingleTimeEdgeMover:
                 other_edges.add(tuple(new_edge))
                 # Add all time edges
                 for topo_neighbor in neighbor.topo_neighbors:
-                    new_edge = [neighbor, topo_neighbor]
+                    new_edge = [neighbor, topo_neighbor.target]
                     # Sort to avoid duplicates
                     new_edge.sort(key=id)
                     other_edges.add(tuple(new_edge))

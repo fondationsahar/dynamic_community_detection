@@ -114,7 +114,7 @@ class LinkStream:
             source = leaf.node
             time = leaf.time
             for neighb in leaf.topo_neighbors:
-                target = neighb.node
+                target = neighb.target.node
                 fsource, ftarget = sorted([source, target])
                 time_links.add((fsource, ftarget, time))
         return time_links

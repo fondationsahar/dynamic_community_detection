@@ -132,8 +132,8 @@ def get_neighbors_modules_parents(module: Module, time=True, topo=True):
     neighbors_modules = set[Module]()
     for leaf in module.leaves:
         if topo:
-            for tmp_leaf in leaf.topo_neighbors:
-                neighbors_modules.add(tmp_leaf.module)
+            for tmp_edge in leaf.topo_neighbors:
+                neighbors_modules.add(tmp_edge.target.module)
         if time:
             if (
                 leaf.left_time_active_neighbor is not None

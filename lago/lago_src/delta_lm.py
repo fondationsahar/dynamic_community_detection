@@ -237,7 +237,7 @@ class DeltaLongitudinalModularityComputer:
         """
 
         # In k-partite networks, only interactions between different partites are expected
-        if partite_mapping.get(node1, -1) == partite_mapping.get(node1, -2):
+        if partite_mapping.get(node1, -1) == partite_mapping.get(node2, -2):
             return 0
 
         if self.linkstream.directed:

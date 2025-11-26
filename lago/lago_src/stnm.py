@@ -13,8 +13,14 @@ class SingleTimeNodeMover(TimeModuleMover):
         fast_exploration: bool,
         modules: set[Module],
         delta_lm_computer: DeltaLongitudinalModularityComputer,
+        partite_mapping: dict[int, int],
     ) -> None:
-        super().__init__(fast_exploration, modules, delta_lm_computer)
+        super().__init__(
+            fast_exploration,
+            modules,
+            delta_lm_computer,
+            partite_mapping,
+        )
 
     def run(
         self,

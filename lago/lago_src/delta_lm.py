@@ -145,9 +145,6 @@ class DeltaLongitudinalModularityComputer:
             float: delta value for expected number of edges
         """
 
-        # TODO Must include the kpartite version
-        # Not implemented yet
-
         if partite_mapping:
             return self._get_expectation_jm_kpartite_part(
                 M0_leaves,

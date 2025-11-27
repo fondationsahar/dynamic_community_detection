@@ -191,8 +191,10 @@ class DeltaLongitudinalModularityComputer:
 
         nodes_in_Cx = [*{*[leaf.node for leaf in Mx_leaves]}]
         nodes_in_Cx_U_C0 = [*{*[leaf.node for leaf in Mx_leaves | M0_leaves]}]
+        in_Cx = {node: node in nodes_in_Cx for node in nodes_in_Cx_U_C0}
         duration_Cx = tls.get_module_duration(Mx_leaves)
         duration_Cx_U_C0 = tls.get_module_duration(Mx_leaves | M0_leaves)
+
         if self.linkstream.directed:
             expectation_diff = 0
             for node1, node2 in combinations_with_replacement(nodes_in_Cx_U_C0, 2):
@@ -205,10 +207,7 @@ class DeltaLongitudinalModularityComputer:
 
                 expectation_diff += (
                     degree_in1 * degree_out2 + degree_in2 * degree_out1
-                ) * (
-                    duration_Cx_U_C0
-                    - (node1 in nodes_in_Cx) * (node2 in nodes_in_Cx) * duration_Cx
-                )
+                ) * (duration_Cx_U_C0 - in_Cx[node1] * in_Cx[node2] * duration_Cx)
             expectation_diff /= (
                 4 * self.linkstream.weight * self.linkstream.network_duration
             )
@@ -225,10 +224,7 @@ class DeltaLongitudinalModularityComputer:
                 expectation_diff += (
                     degree1
                     * degree2
-                    * (
-                        duration_Cx_U_C0
-                        - (node1 in nodes_in_Cx) * (node2 in nodes_in_Cx) * duration_Cx
-                    )
+                    * (duration_Cx_U_C0 - in_Cx[node1] * in_Cx[node2] * duration_Cx)
                 )
             expectation_diff /= (
                 4 * self.linkstream.weight * self.linkstream.network_duration

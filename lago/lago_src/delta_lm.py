@@ -148,6 +148,13 @@ class DeltaLongitudinalModularityComputer:
         # TODO Must include the kpartite version
         # Not implemented yet
 
+        if partite_mapping:
+            return self._get_expectation_jm_kpartite_part(
+                M0_leaves,
+                Mx_leaves,
+                partite_mapping,
+            )
+
         duration_Cx = tls.get_module_duration(Mx_leaves)
         duration_Cx_U_C0 = tls.get_module_duration(Mx_leaves | M0_leaves)
         if self.linkstream.directed:
@@ -165,6 +172,70 @@ class DeltaLongitudinalModularityComputer:
             expectation_diff = (
                 degree_Cx_U_C0**2 * duration_Cx_U_C0 - degree_Cx**2 * duration_Cx
             ) / (4 * self.linkstream.weight * self.linkstream.network_duration)
+
+        return expectation_diff
+
+    def _get_expectation_jm_kpartite_part(
+        self,
+        M0_leaves: set[Leaf],
+        Mx_leaves: set[Leaf],
+        partite_mapping: dict[int, int],
+    ):
+        """Compute the delta number of expected edges within module Mx
+        if joined by submodule M0, regarding the Joint-Membership expectation.
+
+        Args:
+            M0_leaves (set): M0 submodule time nodes
+            Mx_leaves (set): Mx module time nodes
+
+        Returns:
+            float: delta value for expected number of edges
+        """
+
+        nodes_in_Cx = [*{*[leaf.node for leaf in Mx_leaves]}]
+        nodes_in_Cx_U_C0 = [*{*[leaf.node for leaf in Mx_leaves | M0_leaves]}]
+        duration_Cx = tls.get_module_duration(Mx_leaves)
+        duration_Cx_U_C0 = tls.get_module_duration(Mx_leaves | M0_leaves)
+        if self.linkstream.directed:
+            expectation_diff = 0
+            for node1, node2 in combinations_with_replacement(nodes_in_Cx_U_C0, 2):
+                if partite_mapping.get(node1, -1) == partite_mapping.get(node2, -2):
+                    continue
+                degree_in1 = self.linkstream.degrees_in[node1]
+                degree_in2 = self.linkstream.degrees_in[node2]
+                degree_out1 = self.linkstream.degrees_out[node1]
+                degree_out2 = self.linkstream.degrees_out[node2]
+
+                expectation_diff += (
+                    degree_in1 * degree_out2 + degree_in2 * degree_out1
+                ) * (
+                    duration_Cx_U_C0
+                    - (node1 in nodes_in_Cx) * (node2 in nodes_in_Cx) * duration_Cx
+                )
+            expectation_diff /= (
+                4 * self.linkstream.weight * self.linkstream.network_duration
+            )
+
+        else:
+            # In k-partite networks, only interactions between different partites are expected
+            expectation_diff = 0
+            for node1, node2 in combinations_with_replacement(nodes_in_Cx_U_C0, 2):
+                if partite_mapping.get(node1, -1) == partite_mapping.get(node2, -2):
+                    continue
+                degree1 = self.linkstream.degrees[node1]
+                degree2 = self.linkstream.degrees[node2]
+
+                expectation_diff += (
+                    degree1
+                    * degree2
+                    * (
+                        duration_Cx_U_C0
+                        - (node1 in nodes_in_Cx) * (node2 in nodes_in_Cx) * duration_Cx
+                    )
+                )
+            expectation_diff /= (
+                4 * self.linkstream.weight * self.linkstream.network_duration
+            )
 
         return expectation_diff
 

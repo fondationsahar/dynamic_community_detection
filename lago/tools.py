@@ -2,8 +2,8 @@ from collections import defaultdict
 
 import numpy as np  # type: ignore
 
-import lago.lago_src.lago_tools as lts
-from lago.leaf import Leaf
+from .lago_src import lago_tools as lts
+from .leaf import Leaf
 
 
 def get_module_duration(module_leaves: set[Leaf]):

@@ -101,7 +101,7 @@ class LinkStream:
                     (node, tm2)
                 ].left_time_active_neighbor = self.leaves_dict[(node, tm1)]
 
-    def get_time_links(self) -> set[tuple[int, int, int]]:
+    def get_time_links(self) -> set[tuple[int, int, int, float]]:
         # NOTE Optimize that
         time_links = set()
         for leaf in self.leaves_dict.values():
@@ -109,8 +109,9 @@ class LinkStream:
             time = leaf.time
             for neighb in leaf.topo_neighbors:
                 target = neighb.target.node
+                weight = neighb.weight
                 # fsource, ftarget = sorted([source, target])
-                time_links.add((source, target, time))
+                time_links.add((source, target, time, weight))
         return time_links
 
     def read_txt(self, path: str, columns_order=["source", "target", "time"]) -> None:

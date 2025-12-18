@@ -109,8 +109,8 @@ class LinkStream:
             time = leaf.time
             for neighb in leaf.topo_neighbors:
                 target = neighb.target.node
-                fsource, ftarget = sorted([source, target])
-                time_links.add((fsource, ftarget, time))
+                # fsource, ftarget = sorted([source, target])
+                time_links.add((source, target, time))
         return time_links
 
     def read_txt(self, path: str, columns_order=["source", "target", "time"]) -> None:

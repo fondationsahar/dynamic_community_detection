@@ -8,7 +8,7 @@ license = {text = "MIT"}
 authors = [
     { name="Victor Brabant", email="victorbrabant@gmail.com" }
 ]
-keywords = ["lago", "networks", "temporal networks", "modularity"]
+keywords = ["lago", "networks", "temporal networks", "modularity", "structures"]
 [project.urls]
 Homepage = "https://github.com/fondationsahar/dynamic_community_detection"
 Issues = "https://github.com/fondationsahar/dynamic_community_detection/issues"

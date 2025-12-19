@@ -35,7 +35,12 @@ class LinkStream:
     def add_links(self, links: List[tuple[int, ...]]):
         # NOTE times must be ints such that pgcd of all times is 1
         # Maybe add a specific step to normalize it ? With a specific option ?
-        for source, target, time, weight in links:
+        for link in links:
+            if len(link) > 3:
+                source, target, time, weight = link
+            else:
+                source, target, time = link
+                weight = 1
             self.nb_edges += 1
             self.weight += weight
             self.min_time = min(self.min_time, time)

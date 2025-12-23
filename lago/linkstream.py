@@ -13,9 +13,11 @@ class LinkStream:
     def __init__(
         self,
         directed: bool = False,
+        delayed: bool = False,
         partite_mapping: dict[int, int] = {},
     ):
         self.directed: bool = directed
+        self.delayed: bool = delayed
         self.partite_mapping: dict[int, int] = partite_mapping
 
         self.nodes = set[int]()
@@ -35,6 +37,8 @@ class LinkStream:
     def add_links(self, links: List[tuple[int, ...]]):
         # NOTE times must be ints such that pgcd of all times is 1
         # Maybe add a specific step to normalize it ? With a specific option ?
+
+        # TODO Include delayed linkstreams !
         for link in links:
             if len(link) > 3:
                 source, target, time, weight = link
@@ -90,6 +94,67 @@ class LinkStream:
 
         self._compute_time_neighbors()
 
+    def add_delayed_links(self, links: List[tuple[int, ...]]):
+        # NOTE times must be ints such that pgcd of all times is 1
+        # Maybe add a specific step to normalize it ? With a specific option ?
+
+        # TODO Include delayed linkstreams !
+        for link in links:
+            if len(link) > 4:
+                source, target, source_time, target_time, weight = link
+            else:
+                source, target, source_time, target_time = link
+                weight = 1
+            self.nb_edges += 1
+            self.weight += weight
+            for time in [source_time, target_time]:
+                self.min_time = min(self.min_time, time)
+                self.max_time = max(self.max_time, time)
+            for node, time in [(source, source_time), (target, target_time)]:
+                self.nodes.add(node)
+                if (node, time) not in self.leaves_dict:
+                    self.leaves_dict[(node, time)] = Leaf(
+                        node=node,
+                        time=time,
+                    )
+                if self.directed:
+                    continue
+
+                if node not in self.degrees:
+                    self.degrees[node] = 0
+                self.degrees[node] += weight
+
+            if self.directed:
+                if source not in self.degrees_out:
+                    self.degrees_out[source] = 0
+                self.degrees_out[source] += weight
+                if target not in self.degrees_in:
+                    self.degrees_in[target] = 0
+                self.degrees_in[target] += weight
+
+                # Increment topological neighbors
+                self.leaves_dict[(source, source_time)].topo_neighbors.add(
+                    TimeEdge(self.leaves_dict[(target, target_time)], weight)
+                )
+                self.leaves_dict[(target, target_time)].topo_neighbors_from.add(
+                    TimeEdge(self.leaves_dict[(source, source_time)], weight)
+                )
+
+            else:
+                # Increment topological neighbors
+                self.leaves_dict[(source, source_time)].topo_neighbors.add(
+                    TimeEdge(self.leaves_dict[(target, target_time)], weight)
+                )
+                self.leaves_dict[(target, target_time)].topo_neighbors.add(
+                    TimeEdge(self.leaves_dict[(source, source_time)], weight)
+                )
+
+        self.nodes_durations = {}
+
+        self.network_duration = self.max_time - self.min_time + 1
+
+        self._compute_time_neighbors()
+
     def set_partite(self, partite_mapping: dict[int, int]):
         self.partite_mapping = partite_mapping
 
@@ -108,6 +173,18 @@ class LinkStream:
 
     def get_time_links(self) -> set[tuple[int, int, int, float]]:
         # NOTE Optimize that
+        if self.delayed:
+            time_links = set()
+            for leaf in self.leaves_dict.values():
+                source = leaf.node
+                source_time = leaf.time
+                for neighb in leaf.topo_neighbors:
+                    target = neighb.target.node
+                    weight = neighb.weight
+                    target_time = neighb.time
+                    time_links.add((source, target, source_time, target_time, weight))
+            return time_links
+
         time_links = set()
         for leaf in self.leaves_dict.values():
             source = leaf.node
@@ -130,16 +207,29 @@ class LinkStream:
                 weight = 1
                 if "weight" in columns_order:
                     weight = elements[order_mapping["weight"]]
-                nline = [
-                    int(elements[order_mapping["source"]]),
-                    int(elements[order_mapping["target"]]),
-                    int(elements[order_mapping["time"]]),
-                    float(weight),
-                ]
+
+                if self.delayed:
+                    nline = [
+                        int(elements[order_mapping["source"]]),
+                        int(elements[order_mapping["target"]]),
+                        int(elements[order_mapping["source_time"]]),
+                        int(elements[order_mapping["target_time"]]),
+                        float(weight),
+                    ]
+                else:
+                    nline = [
+                        int(elements[order_mapping["source"]]),
+                        int(elements[order_mapping["target"]]),
+                        int(elements[order_mapping["time"]]),
+                        float(weight),
+                    ]
 
                 links.append(nline)
-            # links = [tuple(map(int, line.strip().split())) for line in file]
-        self.add_links(links)
+
+        if self.delayed:
+            self.add_delayed_links(links)
+        else:
+            self.add_links(links)
 
     def to_txt(self, path: str) -> None:
         with open(path, "w") as file:

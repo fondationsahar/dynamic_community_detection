@@ -181,7 +181,7 @@ class LinkStream:
                 for neighb in leaf.topo_neighbors:
                     target = neighb.target.node
                     weight = neighb.weight
-                    target_time = neighb.time
+                    target_time = neighb.target.time
                     time_links.add((source, target, source_time, target_time, weight))
             return time_links
 

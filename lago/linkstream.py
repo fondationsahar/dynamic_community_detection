@@ -192,7 +192,9 @@ class LinkStream:
         self.nodes_durations = {}
 
         self.network_duration = self.max_time - self.min_time + 1
+        print("Splitting continuous linkstream...")
         self._split_continous_linkstream()
+        print("\tOk")
         self._compute_time_neighbors()
 
     def _split_continous_linkstream(self) -> None:
@@ -390,21 +392,30 @@ class LinkStream:
                 if "weight" in columns_order:
                     weight = elements[order_mapping["weight"]]
 
-                if self.delayed:
+                if self.continuous:
                     nline = [
                         int(elements[order_mapping["source"]]),
                         int(elements[order_mapping["target"]]),
-                        int(elements[order_mapping["source_time"]]),
-                        int(elements[order_mapping["target_time"]]),
+                        int(elements[order_mapping["time_start"]]),
+                        int(elements[order_mapping["duration"]]),
                         float(weight),
                     ]
                 else:
-                    nline = [
-                        int(elements[order_mapping["source"]]),
-                        int(elements[order_mapping["target"]]),
-                        int(elements[order_mapping["time"]]),
-                        float(weight),
-                    ]
+                    if self.delayed:
+                        nline = [
+                            int(elements[order_mapping["source"]]),
+                            int(elements[order_mapping["target"]]),
+                            int(elements[order_mapping["source_time"]]),
+                            int(elements[order_mapping["target_time"]]),
+                            float(weight),
+                        ]
+                    else:
+                        nline = [
+                            int(elements[order_mapping["source"]]),
+                            int(elements[order_mapping["target"]]),
+                            int(elements[order_mapping["time"]]),
+                            float(weight),
+                        ]
 
                 links.append(nline)
 

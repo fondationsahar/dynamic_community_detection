@@ -1,3 +1,4 @@
+import copy
 import sys
 from typing import List
 
@@ -12,13 +13,17 @@ from lago.time_edge import TimeEdge
 class LinkStream:
     def __init__(
         self,
+        continuous: bool = False,
         directed: bool = False,
         delayed: bool = False,
         partite_mapping: dict[int, int] = {},
     ):
+        self.continuous: bool = continuous
         self.directed: bool = directed
         self.delayed: bool = delayed
         self.partite_mapping: dict[int, int] = partite_mapping
+
+        # TODO Raise error if continuous and delayed
 
         self.nodes = set[int]()
 
@@ -33,6 +38,8 @@ class LinkStream:
         self.nodes_durations: dict[int, float] = {}
         self.nb_edges: float = 0
         self.weight: float = 0
+
+        self.time_instants = set[int]()
 
     def add_links(self, links: List[tuple[int, ...]]):
         # NOTE times must be ints such that pgcd of all times is 1
@@ -72,6 +79,9 @@ class LinkStream:
                 self.degrees_in[target] += weight
 
                 # Increment topological neighbors
+                # NOTE Same edge is declared two times
+                # Or, each edge can be seen as two wires
+                # TODO Clarify that
                 self.leaves_dict[(source, time)].topo_neighbors.add(
                     TimeEdge(self.leaves_dict[(target, time)], weight)
                 )
@@ -81,6 +91,9 @@ class LinkStream:
 
             else:
                 # Increment topological neighbors
+                # NOTE Same edge is declared two times
+                # Or, each edge can be seen as two wires
+                # TODO Clarify that
                 self.leaves_dict[(source, time)].topo_neighbors.add(
                     TimeEdge(self.leaves_dict[(target, time)], weight)
                 )
@@ -93,6 +106,158 @@ class LinkStream:
         self.network_duration = self.max_time - self.min_time + 1
 
         self._compute_time_neighbors()
+
+    def add_continous_links(self, links: List[tuple[int, ...]]):
+        # NOTE times must be ints such that pgcd of all times is 1
+        # Maybe add a specific step to normalize it ? With a specific option ?
+
+        for link in links:
+            if len(link) > 4:
+                source, target, time, duration, initial_weight = link
+            else:
+                source, target, time, duration = link
+                initial_weight = 1
+            weight = (
+                initial_weight * duration
+            )  # Ponderation in continuous configuration
+            self.nb_edges += 1  # Not relevant for continuous case, TODO arrange that
+            self.weight += weight
+            # NOTE A way to deal with the instantaneous / continous case is to say
+            #   - instantaneous interactions are continous that last 1 (duration = 1)
+            self.min_time = min(self.min_time, time)
+            self.max_time = max(self.max_time, time + duration)
+            self.time_instants.add(time)
+            self.time_instants.add(time + duration)
+            for node in [source, target]:
+                self.nodes.add(node)
+                if (node, time) not in self.leaves_dict:
+                    self.leaves_dict[(node, time)] = Leaf(
+                        node=node,
+                        time=time,
+                    )
+                if self.directed:
+                    continue
+
+                if node not in self.degrees:
+                    self.degrees[node] = 0
+                self.degrees[node] += weight
+
+            if self.directed:
+                if source not in self.degrees_out:
+                    self.degrees_out[source] = 0
+                self.degrees_out[source] += weight
+                if target not in self.degrees_in:
+                    self.degrees_in[target] = 0
+                self.degrees_in[target] += weight
+
+                # Increment topological neighbors
+                # NOTE Same edge is declared two times
+                # Or, each edge can be seen as two wires
+                # TODO Clarify that
+                self.leaves_dict[(source, time)].topo_neighbors.add(
+                    TimeEdge(
+                        target=self.leaves_dict[(target, time)],
+                        weight=initial_weight,
+                        duration=duration,
+                    )
+                )
+                self.leaves_dict[(target, time)].topo_neighbors_from.add(
+                    TimeEdge(
+                        target=self.leaves_dict[(source, time)],
+                        weight=initial_weight,
+                        duration=duration,
+                    )
+                )
+
+            else:
+                # Increment topological neighbors
+                # NOTE Same edge is declared two times
+                # Or, each edge can be seen as two wires
+                # TODO Clarify that
+                self.leaves_dict[(source, time)].topo_neighbors.add(
+                    TimeEdge(
+                        target=self.leaves_dict[(target, time)],
+                        weight=initial_weight,
+                        duration=duration,
+                    )
+                )
+                self.leaves_dict[(target, time)].topo_neighbors.add(
+                    TimeEdge(
+                        target=self.leaves_dict[(source, time)],
+                        weight=initial_weight,
+                        duration=duration,
+                    )
+                )
+
+        self.nodes_durations = {}
+
+        self.network_duration = self.max_time - self.min_time + 1
+        self._split_continous_linkstream()
+        self._compute_time_neighbors()
+
+    def _split_continous_linkstream(self) -> None:
+        # Only if self.continous, raise error if not
+        old_leaves_dict = copy.deepcopy(self.leaves_dict)
+        self.leaves_dict: dict[tuple[int, int], Leaf] = {}
+
+        for (node, time), leaf in old_leaves_dict.items():
+            # Split all edges regarding self.time_instants
+            for time_edge in leaf.topo_neighbors:
+                # NOTE This may be a bottle neck. Eyes on it.
+                tmp_time_instants = self.time_instants & set(
+                    range(time, time + time_edge.duration + 1)
+                )
+                tmp_time_instants = sorted(tmp_time_instants)
+                for time_start, time_end in zip(
+                    tmp_time_instants[:-1], tmp_time_instants[1:]
+                ):
+                    duration = time_end - time_start
+                    if (node, time_start) not in self.leaves_dict:
+                        self.leaves_dict[(node, time_start)] = Leaf(
+                            node=node,
+                            time=time_start,
+                        )
+                    target_node = time_edge.target.node
+                    if (target_node, time_start) not in self.leaves_dict:
+                        self.leaves_dict[(target_node, time_start)] = Leaf(
+                            node=target_node,
+                            time=time_start,
+                        )
+
+                    self.leaves_dict[(node, time_start)].topo_neighbors.add(
+                        TimeEdge(
+                            target=self.leaves_dict[(target_node, time_start)],
+                            weight=time_edge.weight * duration,
+                        )
+                    )
+
+            for time_edge in leaf.topo_neighbors_from:
+                tmp_time_instants = self.time_instants & set(
+                    range(time, time + time_edge.duration + 1)
+                )
+                tmp_time_instants = sorted(tmp_time_instants)
+                for time_start, time_end in zip(
+                    tmp_time_instants[:-1], tmp_time_instants[1:]
+                ):
+                    duration = time_end - time_start
+                    if (node, time_start) not in self.leaves_dict:
+                        self.leaves_dict[(node, time_start)] = Leaf(
+                            node=node,
+                            time=time_start,
+                        )
+                    target_node = time_edge.target.node
+                    if (target_node, time_start) not in self.leaves_dict:
+                        self.leaves_dict[(target_node, time_start)] = Leaf(
+                            node=target_node,
+                            time=time_start,
+                        )
+
+                    self.leaves_dict[(node, time_start)].topo_neighbors_from.add(
+                        TimeEdge(
+                            target=self.leaves_dict[(target_node, time_start)],
+                            weight=time_edge.weight * duration,
+                        )
+                    )
 
     def add_delayed_links(self, links: List[tuple[int, ...]]):
         # NOTE times must be ints such that pgcd of all times is 1
@@ -152,6 +317,8 @@ class LinkStream:
         self.nodes_durations = {}
 
         self.network_duration = self.max_time - self.min_time + 1
+
+        # TODO Compute the continous active time nodes here
 
         self._compute_time_neighbors()
 

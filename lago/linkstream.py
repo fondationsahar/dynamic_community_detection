@@ -419,10 +419,14 @@ class LinkStream:
 
                 links.append(nline)
 
+        if self.continuous:
+            self.add_continous_links(links)
+            return
         if self.delayed:
             self.add_delayed_links(links)
-        else:
-            self.add_links(links)
+            return
+
+        self.add_links(links)
 
     def to_txt(self, path: str) -> None:
         with open(path, "w") as file:

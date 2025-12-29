@@ -227,7 +227,8 @@ class LinkStream:
                     self.leaves_dict[(node, time_start)].topo_neighbors.add(
                         TimeEdge(
                             target=self.leaves_dict[(target_node, time_start)],
-                            weight=time_edge.weight * duration,
+                            weight=time_edge.weight,
+                            duration=duration,  # stored here only for retrieval, not used in LAGO. TODO Arrange that
                         )
                     )
 
@@ -255,7 +256,8 @@ class LinkStream:
                     self.leaves_dict[(node, time_start)].topo_neighbors_from.add(
                         TimeEdge(
                             target=self.leaves_dict[(target_node, time_start)],
-                            weight=time_edge.weight * duration,
+                            weight=time_edge.weight,
+                            duration=duration,  # stored here only for retrieval, not used in LAGO. TODO Arrange that
                         )
                     )
 
@@ -340,6 +342,19 @@ class LinkStream:
 
     def get_time_links(self) -> set[tuple[int, int, int, float]]:
         # NOTE Optimize that
+        if self.continuous:
+            time_links = set()
+            for leaf in self.leaves_dict.values():
+                source = leaf.node
+                time = leaf.time
+                for neighb in leaf.topo_neighbors:
+                    target = neighb.target.node
+                    weight = neighb.weight
+                    duration = neighb.duration
+                    target_time = neighb.target.time
+                    time_links.add((source, target, time, duration, weight))
+            return time_links
+
         if self.delayed:
             time_links = set()
             for leaf in self.leaves_dict.values():

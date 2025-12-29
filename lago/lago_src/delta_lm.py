@@ -85,7 +85,9 @@ class DeltaLongitudinalModularityComputer:
         # Only keep inventoried neighbors that are in M0
         # NOTE cannot use a set here because we want to keep duplicated time nodes
         neighbors_weights = [
-            neighb.weight for neighb in all_neighbs if neighb.target in M0_leaves
+            neighb.weight * neighb.duration
+            for neighb in all_neighbs
+            if neighb.target in M0_leaves
         ]
 
         return sum(neighbors_weights)

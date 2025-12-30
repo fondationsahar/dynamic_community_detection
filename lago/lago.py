@@ -10,6 +10,7 @@ def lago_communities(
     linkstream: LinkStream,
     lex: str = "MM",
     nb_iter: int = 1,
+    alpha: float = 1,
     omega: float = 2,
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
@@ -29,6 +30,9 @@ def lago_communities(
             allows greater freedom in the temporal evolution of communities.
             Defaults to "MM".
         nb_iter (int): Number of lago runs. Best results are returned.
+        alpha (float, optional): Resolution parameter. Must be >= 0. Higher values lead
+            to smallest communities topologically.
+            Defaults to 1.
         omega (float, optional): Time resolution parameter. Must be >= 0. Higher values lead
             to more smoothness in communities changes.
             Defaults to 2.
@@ -70,6 +74,7 @@ def lago_communities(
         tmp_relative_lm, raw_modules = lago_run(
             linkstream,
             lex,
+            alpha,
             omega,
             refinement,
             fast_exploration,

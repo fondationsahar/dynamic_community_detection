@@ -16,10 +16,12 @@ class DeltaLongitudinalModularityComputer:
         self,
         linkstream: LinkStream,
         lex: str = "JM",
+        alpha: float = 1,
         omega: float = 2,
     ):
         self.linkstream = linkstream
         self.lex = lex
+        self.alpha = alpha
         self.omega = omega
 
     def M0_to_Mx(
@@ -66,7 +68,7 @@ class DeltaLongitudinalModularityComputer:
         # Deal with time edge durations if necessary.
         csc_diff = self._get_csc_diff(M0_time_segments, Mx_leaves)
 
-        delta_lm = weight_diff - expectation_diff + csc_diff
+        delta_lm = weight_diff - self.alpha * expectation_diff + self.omega * csc_diff
 
         return delta_lm
 
@@ -130,7 +132,7 @@ class DeltaLongitudinalModularityComputer:
                     cscs += 1
 
         # Total cscs are weighted by the time resolution parameter omega
-        csc_diff = -self.omega / 2 * cscs
+        csc_diff = -cscs / 2
 
         return csc_diff
 

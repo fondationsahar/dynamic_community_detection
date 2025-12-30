@@ -13,6 +13,7 @@ def longitudinal_modularity(
     linkstream: LinkStream,
     communities: dict,
     lex_type: str = "MM",
+    alpha: float = 1,
     omega: float = 2,
     ndigits: int = 5,
     return_time_penalty: bool = False,
@@ -66,7 +67,7 @@ def longitudinal_modularity(
     lm_modularity = 0
     for community, expectation in communities_expectations.items():
         nb_links = communities_nb_interactions[community]
-        lm_modularity += nb_links / (2 * linkstream.weight) - expectation
+        lm_modularity += nb_links / (2 * linkstream.weight) - alpha * expectation
 
     lm_modularity += time_penalty
 

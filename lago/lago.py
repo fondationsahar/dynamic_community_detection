@@ -1,3 +1,4 @@
+import copy
 import sys
 
 import lago.tools as tls
@@ -71,7 +72,7 @@ def lago_communities(
         if verbose:
             print(f"\nStart iteration {itr + 1}")
 
-        tmp_relative_lm, raw_modules = lago_run(
+        tmp_relative_lm, tmp_raw_modules = lago_run(
             linkstream,
             lex,
             alpha,
@@ -86,6 +87,8 @@ def lago_communities(
         if tmp_relative_lm < relative_lm:
             continue
         relative_lm = tmp_relative_lm
+        raw_modules = copy.deepcopy(tmp_raw_modules)
+        tmp_raw_modules = set[Module]()
 
     return get_time_communities(raw_modules)
 

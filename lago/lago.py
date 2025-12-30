@@ -85,10 +85,15 @@ def lago_communities(
             ndigits_logs,
         )
         if tmp_relative_lm < relative_lm:
+            print("\n\t> No improvement.")
             continue
         relative_lm = tmp_relative_lm
-        raw_modules = copy.deepcopy(tmp_raw_modules)
+        raw_modules = copy.copy(tmp_raw_modules)
         tmp_raw_modules = set[Module]()
+        if verbose:
+            print("\n\t> Improvement:", round(relative_lm, ndigits=ndigits_logs))
+
+    print("\n")
 
     return get_time_communities(raw_modules)
 

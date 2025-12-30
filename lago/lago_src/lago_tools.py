@@ -30,6 +30,7 @@ def get_nodes_segment(
         # Extend segment on the right until right neighbor (next time occurence of the node)
         # does not exist or belong to another module
         right_time_active_neighbor = right_leaf.right_time_active_neighbor
+        # Extend to the right for the amount of the last edge duration
         while (
             right_time_active_neighbor and right_time_active_neighbor in module_leaves
         ):

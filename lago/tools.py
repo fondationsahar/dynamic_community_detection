@@ -17,8 +17,18 @@ def get_module_duration(module_leaves: set[Leaf]):
     Returns:
         float: duration
     """
-    all_times = [*{leaf.time for leaf in module_leaves}]
-
+    # all_times = [*{leaf.time for leaf in module_leaves}]
+    all_times = set()
+    for leaf in module_leaves:
+        all_times |= set(
+            range(
+                leaf.time,
+                leaf.time
+                + list(leaf.topo_neighbors | leaf.topo_neighbors_from)[0].duration
+                + 1,
+            )
+        )
+    all_times = list(all_times)
     if not all_times:
         return 0
     duration: float = np.max(all_times) - np.min(all_times) + 1
@@ -70,18 +80,28 @@ def get_nodes_durations(
         # Select leaf
         left_leaf = leaves_set.pop()
         right_leaf = left_leaf
+
+        # If necessary, init dictionnary key corresponding to node id
         if left_leaf.node not in nodes_durations:
             nodes_durations[left_leaf.node] = 0
 
         # Extend segment on the right until right neighbor (next time occurence of the node)
         # does not exist or belong to another module
         right_time_active_neighbor = right_leaf.right_time_active_neighbor
+        # Extend to the right for the amount of the last edge duration
+        right_duration = 1
         while (
             right_time_active_neighbor and right_time_active_neighbor in module_leaves
         ):
             right_leaf = right_time_active_neighbor
             leaves_set.remove(right_leaf)
             right_time_active_neighbor = right_leaf.right_time_active_neighbor
+            # Select random topological edge (if not None), they are all supposed to have the same duration.
+            if right_time_active_neighbor:
+                right_duration = list(
+                    right_time_active_neighbor.topo_neighbors
+                    | right_time_active_neighbor.topo_neighbors_from
+                )[0].duration
 
         # Extend duration on the left until left neighbor (previous time occurence of the node)
         # does not exist or belong to another module
@@ -91,7 +111,9 @@ def get_nodes_durations(
             leaves_set.remove(left_leaf)
             left_time_active_neighbor = left_leaf.left_time_active_neighbor
 
-        nodes_durations[left_leaf.node] += right_leaf.time - left_leaf.time + 1
+        nodes_durations[left_leaf.node] += (
+            right_leaf.time - left_leaf.time + right_duration
+        )
 
     return nodes_durations
 
@@ -115,11 +137,16 @@ def get_expanded_module(
     for node, segments in module_segments.items():
         for segment in segments:
             if len(segment) == 1:
-                time_module |= set([(node, segment[0].time)])
-                continue
+                segment = [segment[0], segment[0]]
+                # time_module |= set([(node, segment[0].time)])
+                # continue
             time1 = segment[0].time
-            time2 = segment[1].time
-            time_module |= set(
-                zip([node] * (time2 - time1 + 1), range(time1, time2 + 1))
+            time2 = (
+                segment[1].time
+                + list(segment[1].topo_neighbors | segment[1].topo_neighbors_from)[
+                    0
+                ].duration
             )
+            time_module |= set(zip([node] * (time2 - time1), range(time1, time2)))
+
     return time_module

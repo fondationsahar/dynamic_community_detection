@@ -53,6 +53,7 @@ class DeltaLongitudinalModularityComputer:
                 partite_mapping,
             )
         elif self.lex == "JM":
+            # TODO Ensure compatibility with the continuous setting
             expectation_diff = self._get_expectation_jm_part(
                 M0_leaves,
                 Mx_leaves,
@@ -61,6 +62,8 @@ class DeltaLongitudinalModularityComputer:
         else:
             raise Exception("Wrong lex value")
 
+        # TODO Ensure _get_csc_diff is compatible with the continuous setting
+        # Deal with time edge durations if necessary.
         csc_diff = self._get_csc_diff(M0_time_segments, Mx_leaves)
 
         delta_lm = weight_diff - expectation_diff + csc_diff
@@ -105,6 +108,7 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: delta CSC (Community Switch Counts)
         """
+
         cscs = 0
         # Iterate on node and its time segments when belonging to M0
         for _, segments in M0_time_segments.items():

@@ -168,8 +168,8 @@ class DeltaLongitudinalModularityComputer:
             degree_out_Cx = self._sum_degrees_out(Mx_leaves)
             degree_out_Cx_U_C0 = self._sum_degrees_out(Mx_leaves | M0_leaves)
             expectation_diff = (
-                degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
-                - degree_in_Cx * degree_out_Cx * duration_Cx
+                2 * degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
+                - 2 * degree_in_Cx * degree_out_Cx * duration_Cx
             ) / (4 * self.linkstream.weight * self.linkstream.network_duration)
         else:
             degree_Cx = self._sum_degrees(Mx_leaves)
@@ -240,19 +240,6 @@ class DeltaLongitudinalModularityComputer:
 
         return expectation_diff
 
-    def _sum_degrees(self, module_leaves) -> float:
-        """Compute the sum of the degrees of nodes involved in the set of time nodes.
-
-        Args:
-            module_leaves (set): module time nodes
-
-        Returns:
-            float: sum of the nodes degrees
-        """
-        nodes = set([leaf.node for leaf in module_leaves])
-        degrees = {node: self.linkstream.degrees[node] for node in nodes}
-        return sum(degrees.values())
-
     def _get_expectation_mm_part(
         self,
         M0_leaves: set[Leaf],
@@ -320,8 +307,7 @@ class DeltaLongitudinalModularityComputer:
             ) + self.linkstream.degrees_out.get(
                 node1, 0
             ) * self.linkstream.degrees_in.get(node2, 0)
-            if node1 == node2:  # NOTE Double check that
-                degrees_part /= 2
+            degrees_part *= 2 ** (node1 != node2)
         else:
             degrees_part = (
                 2 ** (node1 != node2)
@@ -340,8 +326,21 @@ class DeltaLongitudinalModularityComputer:
 
         return numerator / denominator
 
-    def _sum_degrees_in(self, module_leaves) -> float:
+    def _sum_degrees(self, module_leaves) -> float:
         """Compute the sum of the degrees of nodes involved in the set of time nodes.
+
+        Args:
+            module_leaves (set): module time nodes
+
+        Returns:
+            float: sum of the nodes degrees
+        """
+        nodes = set([leaf.node for leaf in module_leaves])
+        degrees = {node: self.linkstream.degrees[node] for node in nodes}
+        return sum(degrees.values())
+
+    def _sum_degrees_in(self, module_leaves) -> float:
+        """Compute the sum of the in degrees of nodes involved in the set of time nodes.
 
         Args:
             module_leaves (set): module time nodes
@@ -354,7 +353,7 @@ class DeltaLongitudinalModularityComputer:
         return sum(degrees.values())
 
     def _sum_degrees_out(self, module_leaves) -> float:
-        """Compute the sum of the degrees of nodes involved in the set of time nodes.
+        """Compute the sum of the out degrees of nodes involved in the set of time nodes.
 
         Args:
             module_leaves (set): module time nodes

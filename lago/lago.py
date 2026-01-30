@@ -64,6 +64,9 @@ def lago_communities(
         "STEM",
     ], "Wrong refinement value. Must be None, 'STNM' or 'STEM'."
 
+    if linkstream.continuous:
+        linkstream._split_continuous_linkstream()
+
     relative_lm = -sys.maxsize
 
     raw_modules = set[Module]()
@@ -85,13 +88,16 @@ def lago_communities(
             ndigits_logs,
         )
         if tmp_relative_lm < relative_lm:
-            print("\n\t> No improvement.")
+            print(f"\n\t> [{itr + 1}/{nb_iter}] No improvement.")
             continue
         relative_lm = tmp_relative_lm
         raw_modules = copy.copy(tmp_raw_modules)
         tmp_raw_modules = set[Module]()
         if verbose:
-            print("\n\t> Improvement:", round(relative_lm, ndigits=ndigits_logs))
+            print(
+                f"\n\t> [{itr + 1}/{nb_iter}] Improvement:",
+                round(relative_lm, ndigits=ndigits_logs),
+            )
 
     print("\n")
 
@@ -109,7 +115,6 @@ def get_time_communities(modules) -> dict[int, set[tuple[int, int]]]:
             }
     """
     time_communities = {
-        label: tls.get_expanded_module(module.leaves)
-        for label, module in enumerate(modules)
+        label: tls.get_expanded_module(module.leaves) for label, module in enumerate(modules)
     }
     return time_communities

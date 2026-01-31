@@ -140,13 +140,19 @@ class LongitudinalModulesPlot:
 
         # Data configuration
         self.nodes: set[NodeId] | None = None
-        self._nodes_ordered_list: list[NodeId] | None = None  # Preserves order when set via list
+        self._nodes_ordered_list: list[NodeId] | None = (
+            None  # Preserves order when set via list
+        )
         self.node_labels: list[str] = []
-        self._original_node_labels: list[str] | None = None  # Original labels before remapping
+        self._original_node_labels: list[str] | None = (
+            None  # Original labels before remapping
+        )
         self.communities: Communities | None = None
         self.node_focus: NodeFocus = []
         self.community_focus: list[Any] = []  # List of community labels to focus on
-        self._community_focus_colors: dict[Any, Any] = {}  # Explicit colors for focused communities
+        self._community_focus_colors: dict[
+            Any, Any
+        ] = {}  # Explicit colors for focused communities
         self.show_unfocused_communities: bool = False  # Show non-focused communities
         self.unfocused_style: str = "transparent"  # Style for unfocused communities
         self.unfocused_alpha: float = 0.3  # Alpha for unfocused communities
@@ -174,7 +180,9 @@ class LongitudinalModulesPlot:
         self.edge_flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR
         self.height_community_color: float = DEFAULT_COMMUNITY_HEIGHT
         self.weight_scale: float = DEFAULT_WEIGHT_SCALE
-        self.edge_width_scale: float = 0.3  # Scale 0-1: edge thickness relative to time unit
+        self.edge_width_scale: float = (
+            0.3  # Scale 0-1: edge thickness relative to time unit
+        )
         self.edge_curve_intensity: float = (
             0.0  # For delayed edges: curve intensity (positive=right, negative=left)
         )
@@ -193,7 +201,9 @@ class LongitudinalModulesPlot:
         self.highlight_node_focus: bool = True
 
         # Axis margin settings
-        self.y_padding_bottom: float = 0.0  # Padding at bottom of y-axis (in node units)
+        self.y_padding_bottom: float = (
+            0.0  # Padding at bottom of y-axis (in node units)
+        )
         self.y_padding_top: float = 0.0  # Padding at top of y-axis (in node units)
 
         # Node line style
@@ -214,8 +224,12 @@ class LongitudinalModulesPlot:
         self._nodes_mapping: NodesMapping | None = None
         self._remapped_communities: Communities | None = None
         self._time_links: TimeLinks | None = None
-        self._focused_communities: Communities | None = None  # Primary: specified communities
-        self._secondary_communities: Communities | None = None  # Secondary: big ones, less visible
+        self._focused_communities: Communities | None = (
+            None  # Primary: specified communities
+        )
+        self._secondary_communities: Communities | None = (
+            None  # Secondary: big ones, less visible
+        )
         self._background_communities: Communities | None = None  # Other: gainsboro
         self._start_nodes: dict[int, int] | None = None
         self._end_nodes: dict[int, int] | None = None
@@ -386,9 +400,13 @@ class LongitudinalModulesPlot:
                 # Compare safely with strings (colors can be strings, tuples, or arrays)
                 is_background = False
                 if isinstance(color, str):
-                    is_background = color == "gainsboro" or color == self.background_color
+                    is_background = (
+                        color == "gainsboro" or color == self.background_color
+                    )
                 elif self.background_color == "gainsboro":
-                    is_background = False  # If color is not a string, it's not gainsboro
+                    is_background = (
+                        False  # If color is not a string, it's not gainsboro
+                    )
                 else:
                     # Both are non-string, compare as-is
                     try:
@@ -464,7 +482,9 @@ class LongitudinalModulesPlot:
         self.time_focus = time
         return self
 
-    def set_night_highlights(self, nights: list[TimePoint]) -> "LongitudinalModulesPlot":
+    def set_night_highlights(
+        self, nights: list[TimePoint]
+    ) -> "LongitudinalModulesPlot":
         """
         Set night periods to highlight.
 
@@ -608,7 +628,9 @@ class LongitudinalModulesPlot:
         self.trim = enable
         return self
 
-    def set_color_palette(self, palette: str | Sequence[Any]) -> "LongitudinalModulesPlot":
+    def set_color_palette(
+        self, palette: str | Sequence[Any]
+    ) -> "LongitudinalModulesPlot":
         """
         Set the color palette for community visualization.
 
@@ -685,7 +707,9 @@ class LongitudinalModulesPlot:
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"alpha must be between 0.0 and 1.0, got {alpha}")
         if width_scale is not None and not 0.0 <= width_scale <= 1.0:
-            raise ValueError(f"width_scale must be between 0.0 and 1.0, got {width_scale}")
+            raise ValueError(
+                f"width_scale must be between 0.0 and 1.0, got {width_scale}"
+            )
         self.edge_alpha = alpha
         self.edge_flatten_factor = flatten_factor
         self.color_edges = color
@@ -804,7 +828,9 @@ class LongitudinalModulesPlot:
         """
         valid_styles = {"transparent", "grey", "desaturated", "lighter"}
         if style not in valid_styles:
-            raise ValueError(f"Invalid style '{style}'. Must be one of: {', '.join(valid_styles)}")
+            raise ValueError(
+                f"Invalid style '{style}'. Must be one of: {', '.join(valid_styles)}"
+            )
         if not 0.0 <= intensity <= 1.0:
             raise ValueError(f"intensity must be between 0.0 and 1.0, got {intensity}")
 
@@ -1436,7 +1462,8 @@ class LongitudinalModulesPlot:
 
         # Invert the mapping: {original_id: display_index} -> {display_index: original_id}
         inverted = {
-            display_idx: original_id for original_id, display_idx in self._nodes_mapping.items()
+            display_idx: original_id
+            for original_id, display_idx in self._nodes_mapping.items()
         }
 
         # Return original IDs sorted by display index
@@ -1462,7 +1489,9 @@ class LongitudinalModulesPlot:
         if self._nodes_ordered_list is not None:
             nodes_to_display_ordered = self._nodes_ordered_list
         else:
-            nodes_to_display_ordered = list(self.nodes if self.nodes else self.linkstream.nodes)
+            nodes_to_display_ordered = list(
+                self.nodes if self.nodes else self.linkstream.nodes
+            )
         nodes_to_display_set = set(nodes_to_display_ordered)
 
         nodes_mapping: NodesMapping = {
@@ -1525,7 +1554,9 @@ class LongitudinalModulesPlot:
         # Store the final nodes_to_display list with mapped indices
         # Only include nodes that are in the mapping
         self.nodes_to_display = [
-            nodes_mapping[node] for node in nodes_to_display_set if node in nodes_mapping
+            nodes_mapping[node]
+            for node in nodes_to_display_set
+            if node in nodes_mapping
         ]
         self._nodes_mapping = nodes_mapping
 
@@ -1544,21 +1575,36 @@ class LongitudinalModulesPlot:
         # Step 1: Determine primary/focused communities
         if self.community_focus:
             # Use community labels directly to determine focused communities
+            # Handle both string and int keys for robust matching
             focus_labels_set = set(self.community_focus)
+            focus_labels_extended = set()
+            for label in focus_labels_set:
+                focus_labels_extended.add(label)
+                # Add both string and int versions for robust matching
+                if isinstance(label, str):
+                    try:
+                        focus_labels_extended.add(int(label))
+                    except ValueError:
+                        pass
+                elif isinstance(label, int):
+                    focus_labels_extended.add(str(label))
+
             self._focused_communities = {
                 label: members
                 for label, members in self._remapped_communities.items()
-                if label in focus_labels_set
+                if label in focus_labels_extended
             }
             remaining_communities = {
                 label: members
                 for label, members in self._remapped_communities.items()
-                if label not in focus_labels_set
+                if label not in focus_labels_extended
             }
         else:
             # Use node_focus and time_focus to determine focused communities
-            self._focused_communities, remaining_communities = prepare_communities_for_display(
-                self._remapped_communities, self.node_focus, self.time_focus, False
+            self._focused_communities, remaining_communities = (
+                prepare_communities_for_display(
+                    self._remapped_communities, self.node_focus, self.time_focus, False
+                )
             )
 
         # Step 2: From remaining, split into secondary (with colors) and background (gainsboro)
@@ -1599,7 +1645,9 @@ class LongitudinalModulesPlot:
             )
             if len(focused_sorted) > self.max_shown_communities:
                 # Move excess focused to background
-                self._focused_communities = dict(focused_sorted[: self.max_shown_communities])
+                self._focused_communities = dict(
+                    focused_sorted[: self.max_shown_communities]
+                )
                 excess = dict(focused_sorted[self.max_shown_communities :])
                 self._background_communities.update(excess)
                 self._secondary_communities = {}
@@ -1699,7 +1747,9 @@ class LongitudinalModulesPlot:
 
         time_links = self.linkstream.get_time_links()
         nodes_set: set[NodeId] = (
-            set(self.nodes_to_display) if self.nodes_to_display else set(self.linkstream.nodes)
+            set(self.nodes_to_display)
+            if self.nodes_to_display
+            else set(self.linkstream.nodes)
         )
         communities_dict = self.communities if self.communities is not None else {}
 
@@ -1744,7 +1794,9 @@ class LongitudinalModulesPlot:
             filtered_labels.update(self._background_communities.keys())
 
         nodes_mapping = self._nodes_mapping or {}
-        nodes_to_display_set = set(self.nodes_to_display) if self.nodes_to_display else set()
+        nodes_to_display_set = (
+            set(self.nodes_to_display) if self.nodes_to_display else set()
+        )
 
         communities_nodes_segments: CommunityNodesSegments = {}
 
@@ -1765,7 +1817,9 @@ class LongitudinalModulesPlot:
                     continue
 
                 # Convert TimeSegment objects to [start, end] lists
-                nodes_segments[mapped_node] = [[seg.start, seg.end] for seg in time_segments]
+                nodes_segments[mapped_node] = [
+                    [seg.start, seg.end] for seg in time_segments
+                ]
 
             if nodes_segments:
                 communities_nodes_segments[module_label] = nodes_segments
@@ -1792,7 +1846,9 @@ class LongitudinalModulesPlot:
             if self._start_nodes is not None and self._end_nodes is not None:
                 # Use the actual mapped node indices, not sequential 0..N-1
                 # nodes_to_display contains the remapped node indices
-                nodes_set = set(self.nodes_to_display) if self.nodes_to_display else set()
+                nodes_set = (
+                    set(self.nodes_to_display) if self.nodes_to_display else set()
+                )
                 draw_nodes(
                     self._ax,
                     nodes_set,
@@ -1809,7 +1865,10 @@ class LongitudinalModulesPlot:
     def _draw_edges(self) -> None:
         """Draw edges between nodes."""
         if self._show_edges and self._ax is not None and self._time_links is not None:
-            if self._time_node_community_mapping is not None and self._color_mapping is not None:
+            if (
+                self._time_node_community_mapping is not None
+                and self._color_mapping is not None
+            ):
                 if self.linkstream.delayed:
                     draw_edges_delayed(
                         self._ax,
@@ -1841,8 +1900,15 @@ class LongitudinalModulesPlot:
 
     def _draw_edge_activity(self) -> None:
         """Draw edge activity markers as rectangles."""
-        if self._show_edge_activity and self._ax is not None and self._time_links is not None:
-            if self._time_node_community_mapping is not None and self._color_mapping is not None:
+        if (
+            self._show_edge_activity
+            and self._ax is not None
+            and self._time_links is not None
+        ):
+            if (
+                self._time_node_community_mapping is not None
+                and self._color_mapping is not None
+            ):
                 if self.linkstream.delayed:
                     draw_edge_activity_delayed(
                         self._ax,

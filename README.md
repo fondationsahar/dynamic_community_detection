@@ -35,93 +35,57 @@ We call this task **Dynamic Community Detection**.
 
 ## Usage 
 
-
 ```python
-from lago import LinkStream, lago_modules, LexType
-```
+from lago import LinkStream, lago_modules
 
-```python
-## Declare time links according to the following format:
-# <source node>, <target node>, <time instant>
-## Values must be integers
-
+# Declare time links: (source, target, time)
 time_links = [
-    [2, 3, 0],
-    [0, 1, 2],
-    [2, 3, 3],
-    [3, 4, 5],
-    [2, 3, 6],
-    [2, 4, 7],
-    [0, 1, 8],
-    [1, 2, 9],
-    [3, 4, 9],
-    [0, 2, 10],
-    [1, 2, 11],
-    [3, 4, 13],
-    [1, 2, 14],
-    [2, 4, 16],
-    [0, 1, 17],
-    [0, 1, 18],
-    [2, 3, 18],
-    [3, 4, 19],
+    (2, 3, 0), (0, 1, 2), (2, 3, 3), (3, 4, 5), (2, 3, 6),
+    (2, 4, 7), (0, 1, 8), (1, 2, 9), (3, 4, 9), (0, 2, 10),
+    (1, 2, 11), (3, 4, 13), (1, 2, 14), (2, 4, 16), (0, 1, 17),
+    (0, 1, 18), (2, 3, 18), (3, 4, 19),
 ]
+
+# Create link stream
+ls = LinkStream()
+ls.add_links(time_links)
+
+# Display info
+print(f"{ls.nb_nodes} nodes, {ls.nb_edges} edges, {ls.network_duration} time steps")
 ```
 
 ```python
-## Initiate empty temporal network (as a link stream)
-my_linkstream = LinkStream()
-
-## Add time links to the link stream
-my_linkstream.add_links(time_links)
-
-# NOTE time links can also be imported from txt files with the read_txt() method
-
-## Display linkstream informations
-print(f"The link stream consists of {my_linkstream.nb_edges} temporal edges (or time links) "
-      f"across {my_linkstream.nb_nodes} nodes and {my_linkstream.network_duration} time steps, "
-      f"of which only {my_linkstream.nb_timesteps} contain activity.")
-```
-
-```python
-## Detect temporal modules
-time_modules = lago_modules(
-    my_linkstream,
-    lex_type=LexType.MM,  # Mean-Membership expectation
-    nb_iter=3,            # Run LAGO 3 times and return best result
+# Detect temporal communities
+communities = lago_modules(
+    ls,
+    lex="MM",    # Mean-Membership expectation
+    nb_iter=3,   # Run 3 times, keep best
 )
 
-# Each module contains (node, time) tuples
-print(f"{time_modules.nb_modules} temporal modules have been found")
+print(f"{communities.nb_modules} communities found")
 
-# Iterate over modules
-for module in time_modules.iter_modules():
-    print(f"Module {module.label}: {module.size} nodes, {module.duration} timesteps")
+for module in communities.iter_modules():
+    print(f"  Module {module.label}: {module.size} nodes, {module.duration} timesteps")
 ```
 
-#### Plot Temporal Modules (requires dcd-lago[viz])
+#### Visualize Results (requires `dcd-lago[viz]`)
 ```python
-from lago import LongitudinalModulesPlot
+from lago.viz import LongitudinalModulesPlot
 
-plot = LongitudinalModulesPlot(my_linkstream, width=1200, height=800)
+plot = LongitudinalModulesPlot(ls, width=1200, height=800)
 plot.configure_nodes(auto_ordering=True)
-plot.configure_modules(time_modules)
+plot.configure_edges(show_activity=True)
+plot.configure_communities(communities=communities)
 plot.draw()
-plot.save("modules.png")
+plot.save("communities.png")
 ```
 
-#### Compute Longitudinal Modularity Score
+#### Compute Quality Score
 ```python
 from lago import longitudinal_modularity
 
-## Compute Longitudinal Modularity score
-## (the higher the better / maximum is 1)
-result = longitudinal_modularity(
-    my_linkstream, 
-    time_modules,
-    lex_type=LexType.MM,
-)
-
-print(f"Longitudinal Modularity score: {result.value}")
+result = longitudinal_modularity(ls, communities, lex="MM")
+print(f"L-Modularity: {result.value}")
 ```
 
 ## Advanced Parameters

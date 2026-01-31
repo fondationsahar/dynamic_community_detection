@@ -1,0 +1,1924 @@
+"""
+LongitudinalModulesPlot class for creating and customizing time modules visualizations.
+
+This module provides an object-oriented interface for creating longitudinal community plots
+with matplotlib-like customization capabilities.
+
+Example:
+    >>> from lago.viz import LongitudinalModulesPlot
+    >>> plot = LongitudinalModulesPlot(linkstream, width=1600, height=1200)
+    >>> plot.set_communities(communities)
+    >>> plot.set_edge_style(alpha=0.5)
+    >>> plot.draw()
+    >>> plot.save("output.png")
+"""
+
+from collections.abc import Sequence
+from typing import (
+    Any,
+    Literal,
+    overload,
+)
+
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+
+from .configuration import configure_axes, finalize_plot, setup_figure_and_axes
+from .constants import (
+    DEFAULT_BACKGROUND_COMMUNITY_COLOR,
+    DEFAULT_COMMUNITY_HEIGHT,
+    DEFAULT_EDGE_ALPHA,
+    DEFAULT_EDGE_FLATTEN_FACTOR,
+    DEFAULT_FIGURE_HEIGHT,
+    DEFAULT_FIGURE_WIDTH,
+    DEFAULT_LABEL_FONT_SIZE,
+    DEFAULT_NODE_ALPHA,
+    DEFAULT_NODE_LABEL_FONT_SIZE,
+    DEFAULT_NODE_LABEL_PADDING,
+    DEFAULT_WEIGHT_SCALE,
+)
+from .data_preparation import (
+    calculate_node_time_ranges,
+    create_time_node_community_mapping,
+    prepare_communities_for_display,
+)
+from .drawing import (
+    draw_community_periods,
+    draw_edge_activity,
+    draw_edge_activity_delayed,
+    draw_edges,
+    draw_edges_delayed,
+    draw_focus_highlights,
+    draw_night_highlights,
+    draw_nodes,
+)
+from .types import (
+    ColorMapping,
+    Communities,
+    CommunityNodesSegments,
+    NodeFocus,
+    NodeId,
+    NodesMapping,
+    TimeLinks,
+    TimeNodeCommunityMapping,
+    TimePoint,
+)
+
+
+def _convert_time_modules_to_communities(time_modules: Any) -> Communities:
+    """
+    Convert a TimeModules object to the Communities dict format.
+
+    Args:
+        time_modules: A lago TimeModules object.
+
+    Returns:
+        Communities dict in the format {label: [(node, time), ...]}.
+
+    Raises:
+        TypeError: If input is not a TimeModules object.
+    """
+    if not hasattr(time_modules, "to_communities_dict"):
+        raise TypeError(
+            f"communities must be a TimeModules object, got {type(time_modules).__name__}. "
+            "Raw dicts are no longer supported - use TimeModules instead."
+        )
+
+    raw_dict = time_modules.to_communities_dict()
+    return {
+        key: list(members) if isinstance(members, set) else members
+        for key, members in raw_dict.items()
+    }
+
+
+from .utils import generate_color_mapping
+
+
+class LongitudinalModulesPlot:
+    """
+    Main class for creating and customizing time modules visualizations.
+
+    This class provides a matplotlib-like interface for creating longitudinal community
+    plots with method chaining support for configuration.
+
+    Attributes:
+        linkstream: The linkstream object containing temporal network data.
+        width: Figure width in pixels.
+        height: Figure height in pixels.
+        communities: Dictionary of communities to display.
+        node_focus: List of nodes to focus/highlight.
+        nodes_to_display: List of node indices to display.
+
+    Example:
+        >>> plot = LongitudinalModulesPlot(linkstream)
+        >>> plot.set_nodes(nodes_to_display, labels=labels)
+        >>> plot.set_communities(communities)
+        >>> plot.toggle_edges(False)
+        >>> plot.toggle_edge_activity(True)
+        >>> fig, ax = plot.draw(return_ax=True)
+        >>> plot.save("output.png", dpi=750)
+    """
+
+    def __init__(
+        self,
+        linkstream: Any,
+        width: int = DEFAULT_FIGURE_WIDTH,
+        height: int = DEFAULT_FIGURE_HEIGHT,
+    ) -> None:
+        """
+        Initialize a longitudinal plot.
+
+        Args:
+            linkstream: The linkstream object containing temporal network data.
+            width: Figure width in pixels.
+            height: Figure height in pixels.
+        """
+        self.linkstream = linkstream
+        self.width = width
+        self.height = height
+
+        # Data configuration
+        self.nodes: set[NodeId] | None = None
+        self._nodes_ordered_list: list[NodeId] | None = None  # Preserves order when set via list
+        self.node_labels: list[str] = []
+        self._original_node_labels: list[str] | None = None  # Original labels before remapping
+        self.communities: Communities | None = None
+        self.node_focus: NodeFocus = []
+        self.community_focus: list[Any] = []  # List of community labels to focus on
+        self._community_focus_colors: dict[Any, Any] = {}  # Explicit colors for focused communities
+        self.show_unfocused_communities: bool = False  # Show non-focused communities
+        self.unfocused_style: str = "transparent"  # Style for unfocused communities
+        self.unfocused_alpha: float = 0.3  # Alpha for unfocused communities
+        self.background_color: Any = DEFAULT_BACKGROUND_COMMUNITY_COLOR  # Tier 3 color
+        self.time_focus: TimePoint | None = None
+        self.node_OR_time_focus: bool = False
+        self.nodes_to_display: list[int] | None = None
+
+        # Visualization settings
+        self._show_edges: bool = True
+        self._show_edge_activity: bool = False
+        self._show_nodes: bool = True
+        self.auto_nodes_ordering: bool = False
+        self.monochrome: bool = False
+        self.trim: bool = False
+        self.max_shown_communities: int = -1
+        self.hide_self_communities: bool = False
+        self.nights: list[TimePoint] = []
+
+        # Style settings
+        self.edge_alpha: float = DEFAULT_EDGE_ALPHA
+        self.node_alpha: float = DEFAULT_NODE_ALPHA
+        self.longitudinal_nodes_margin: float = 0
+        self.color_edges: bool = False
+        self.edge_flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR
+        self.height_community_color: float = DEFAULT_COMMUNITY_HEIGHT
+        self.weight_scale: float = DEFAULT_WEIGHT_SCALE
+        self.edge_width_scale: float = 0.3  # Scale 0-1: edge thickness relative to time unit
+        self.edge_curve_intensity: float = (
+            0.0  # For delayed edges: curve intensity (positive=right, negative=left)
+        )
+        self.show_edge_orientation: bool = False
+        self.color_palette: str | Sequence[Any] | None = None
+
+        # Label settings
+        self.display_xticks_labels: bool = False
+        self.display_yticks_labels: bool = False
+        self.display_xlabel: bool = True
+        self.display_ylabel: bool = True
+        self.label_font_size: int = DEFAULT_LABEL_FONT_SIZE
+        self.node_label_fontsize: int = DEFAULT_NODE_LABEL_FONT_SIZE
+        self.node_labels_padding: int = DEFAULT_NODE_LABEL_PADDING
+        self.bold_labels: list[str] = []
+        self.highlight_node_focus: bool = True
+
+        # Axis margin settings
+        self.y_padding_bottom: float = 0.0  # Padding at bottom of y-axis (in node units)
+        self.y_padding_top: float = 0.0  # Padding at top of y-axis (in node units)
+
+        # Node line style
+        self.node_linewidth: float = 0.25  # Line width for regular nodes
+        self.node_linewidth_focus: float = 0.5  # Line width for focused nodes
+
+        # Edge activity marker style
+        self.edge_activity_width: float = 0.8  # Width of edge activity rectangles
+        self.edge_activity_height: float = 0.4  # Height of edge activity rectangles
+        self.edge_activity_alpha: float = DEFAULT_EDGE_ALPHA  # Alpha for markers
+
+        # Internal state
+        self._fig: Figure | None = None
+        self._ax: Axes | None = None
+        self._drawn: bool = False
+
+        # Computed data (populated during _prepare_data)
+        self._nodes_mapping: NodesMapping | None = None
+        self._remapped_communities: Communities | None = None
+        self._time_links: TimeLinks | None = None
+        self._focused_communities: Communities | None = None  # Primary: specified communities
+        self._secondary_communities: Communities | None = None  # Secondary: big ones, less visible
+        self._background_communities: Communities | None = None  # Other: gainsboro
+        self._start_nodes: dict[int, int] | None = None
+        self._end_nodes: dict[int, int] | None = None
+        self._time_node_community_mapping: TimeNodeCommunityMapping | None = None
+        self._color_mapping: ColorMapping | None = None
+        self._communities_nodes_segments: CommunityNodesSegments | None = None
+
+    def set_nodes(
+        self,
+        nodes: set[NodeId] | list[NodeId] | None = None,
+        labels: list[str] | None = None,
+        focus: list[NodeId] | None = None,
+        longitudinal_nodes_margin: float = 0,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure nodes to display.
+
+        If a list is provided, the order is preserved (useful when reusing node ordering
+        from another plot via `get_node_order()`). If a set is provided, order is arbitrary.
+
+        Args:
+            nodes: Set or list of nodes to display. If None, uses all nodes from linkstream.
+                   If a list, the order is preserved for display.
+            labels: Optional list of labels for nodes.
+            focus: Optional list of nodes to focus/highlight.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Reuse node order from another plot
+            >>> node_order = plot1.get_node_order()
+            >>> plot2.set_nodes(node_order)  # Preserves order
+            >>> plot2.auto_node_ordering(False)  # Don't recompute
+        """
+        self.longitudinal_nodes_margin = longitudinal_nodes_margin
+        if nodes is None:
+            self.nodes = self.linkstream.nodes
+            self._nodes_ordered_list = None
+        elif isinstance(nodes, list):
+            # Preserve order when a list is provided
+            self._nodes_ordered_list = list(nodes)
+            self.nodes = set(nodes)
+        else:
+            self.nodes = set(nodes)
+            self._nodes_ordered_list = None
+        self.node_labels = labels or []
+        if focus:
+            self.set_focus_nodes(focus)
+        return self
+
+    def set_focus_nodes(
+        self, nodes: list[NodeId], bold_labels: list[str] | None = None
+    ) -> "LongitudinalModulesPlot":
+        """
+        Set nodes to focus on. Only communities containing these nodes will be colored.
+
+        Note: Cannot be used together with set_focus_communities().
+
+        Args:
+            nodes: List of node indices to focus on.
+            bold_labels: Optional list of labels to display in bold.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ValueError: If community_focus is already set.
+        """
+        if self.community_focus:
+            raise ValueError(
+                "Cannot use both node_focus and community_focus. "
+                "Use set_focus_communities() OR set_focus_nodes(), not both."
+            )
+        self.node_focus = nodes
+        self.bold_labels = bold_labels or []
+        return self
+
+    def set_focus_communities(
+        self, community_labels: list[Any] | dict[Any, Any]
+    ) -> "LongitudinalModulesPlot":
+        """
+        Set communities to focus on by their labels. Only these communities will be colored.
+
+        Note: Cannot be used together with set_focus_nodes().
+
+        Args:
+            community_labels: Either a list of community labels to focus on,
+                or a dict mapping community labels to colors.
+                Labels should match the keys in the communities dictionary.
+                Colors can be specified as:
+                - Named colors: 'red', 'blue', 'green', etc.
+                - Hex strings: '#FF5733', '#33FF57', etc.
+                - RGB tuples: (0.9, 0.1, 0.1), (0.1, 0.9, 0.1), etc.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ValueError: If node_focus is already set.
+
+        Example:
+            >>> # Using a list (colors will be auto-assigned)
+            >>> plot.set_focus_communities(['community_1', 'community_5'])
+            >>>
+            >>> # Using a dict with explicit colors
+            >>> plot.set_focus_communities({
+            ...     'community_1': 'red',
+            ...     'community_5': '#00FF00',
+            ...     'ukraine_cluster': (0.1, 0.1, 0.9)
+            ... })
+        """
+        if self.node_focus:
+            raise ValueError(
+                "Cannot use both node_focus and community_focus. "
+                "Use set_focus_communities() OR set_focus_nodes(), not both."
+            )
+        if isinstance(community_labels, dict):
+            self.community_focus = list(community_labels.keys())
+            self._community_focus_colors = dict(community_labels)
+        else:
+            self.community_focus = list(community_labels)
+            self._community_focus_colors = {}
+        return self
+
+    def get_color_mapping(
+        self, print_mapping: bool = False, focused_only: bool = True
+    ) -> dict[Any, Any]:
+        """
+        Get the color mapping used for communities.
+
+        Returns the mapping of community labels to colors. If the plot has not
+        been drawn yet, it will prepare the data first.
+
+        Args:
+            print_mapping: If True, prints the color mapping to stdout.
+            focused_only: If True (default), only returns communities with actual colors
+                (excludes monochrome/grey communities). Set to False to include all communities.
+
+        Returns:
+            Dictionary mapping community labels to their assigned colors.
+            By default, only includes focused communities (not monochrome ones).
+
+        Example:
+            >>> plot.draw()
+            >>> colors = plot.get_color_mapping()
+            >>> print(colors)
+            {'community_1': (0.12, 0.47, 0.71), 'community_2': (1.0, 0.5, 0.05), ...}
+            >>>
+            >>> # Include all communities (including grey/monochrome)
+            >>> colors = plot.get_color_mapping(focused_only=False)
+            >>>
+            >>> # Print while getting
+            >>> plot.get_color_mapping(print_mapping=True)
+        """
+        if self._color_mapping is None:
+            if not self._drawn:
+                self._validate_configuration()
+                self._prepare_data()
+
+        if self._color_mapping is None:
+            return {}
+
+        # Filter to only focused communities if requested
+        if focused_only:
+            result = {}
+            for label, color in self._color_mapping.items():
+                # Compare safely with strings (colors can be strings, tuples, or arrays)
+                is_background = False
+                if isinstance(color, str):
+                    is_background = color == "gainsboro" or color == self.background_color
+                elif self.background_color == "gainsboro":
+                    is_background = False  # If color is not a string, it's not gainsboro
+                else:
+                    # Both are non-string, compare as-is
+                    try:
+                        is_background = color == self.background_color
+                    except (ValueError, TypeError):
+                        is_background = False
+
+                if not is_background:
+                    result[label] = color
+        else:
+            result = dict(self._color_mapping)
+
+        if print_mapping:
+            print("Community Color Mapping:")
+            print("-" * 40)
+            for label, color in result.items():
+                if color == "gainsboro":
+                    print(f"  {label}: {color} (monochrome)")
+                else:
+                    print(f"  {label}: {color}")
+
+        return result
+
+    def set_communities(
+        self,
+        communities: Any,
+        max_shown: int = -1,
+        hide_self: bool = False,
+        margin_commu_segment: float = 0.25,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure communities to display.
+
+        Args:
+            communities: Communities data. Can be either:
+                - Dictionary mapping community labels to list of (node, time) tuples.
+                - TimeModules object (from lago library) - will be auto-converted.
+            max_shown: Maximum number of communities to show (-1 for all).
+            hide_self: Whether to hide single-node communities.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Using a dictionary
+            >>> plot.set_communities({'com_1': [(0, 0), (0, 1), (1, 0)]})
+            >>>
+            >>> # Using a TimeModules object from lago
+            >>> from lago import TimeModules
+            >>> tm = TimeModules(path="communities.json")
+            >>> plot.set_communities(tm)
+        """
+        # Store original TimeModules object for efficient access to node segments
+        self._original_time_modules = (
+            communities if hasattr(communities, "get_time_modules_dict") else None
+        )
+        self.communities = _convert_time_modules_to_communities(communities)
+        self.max_shown_communities = max_shown
+        self.hide_self_communities = hide_self
+        self.margin_commu_segment = margin_commu_segment
+        return self
+
+    def set_time_focus(self, time: TimePoint) -> "LongitudinalModulesPlot":
+        """
+        Set time period to focus on.
+
+        Args:
+            time: Time point to focus on.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.time_focus = time
+        return self
+
+    def set_night_highlights(self, nights: list[TimePoint]) -> "LongitudinalModulesPlot":
+        """
+        Set night periods to highlight.
+
+        Args:
+            nights: List of time points for night highlights.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.nights = nights
+        return self
+
+    def toggle_edges(self, show: bool = True) -> "LongitudinalModulesPlot":
+        """
+        Control whether to display edges.
+
+        Args:
+            show: Whether to show edges.
+
+        Returns:
+            Self for method chaining.
+        """
+        self._show_edges = show
+        return self
+
+    def toggle_edge_activity(self, show: bool = True) -> "LongitudinalModulesPlot":
+        """
+        Control whether to display edge activity markers.
+
+        Args:
+            show: Whether to show edge activity markers.
+
+        Returns:
+            Self for method chaining.
+        """
+        self._show_edge_activity = show
+        return self
+
+    def set_edge_activity_style(
+        self,
+        width: float = 0.8,
+        height: float = 0.4,
+        alpha: float | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure edge activity marker visualization style.
+
+        Edge activity markers are displayed as rectangles at node positions
+        where edges occur.
+
+        Args:
+            width: Width of edge activity rectangles (0.0 to 1.0). Default 0.8.
+                At 1.0, rectangles fill the entire time unit width.
+            height: Height of edge activity rectangles (0.0 to 1.0). Default 0.4.
+                At 1.0, rectangles fill the entire node row height.
+            alpha: Transparency of markers (0.0 to 1.0). Default uses edge_alpha.
+                0.0 = fully transparent, 1.0 = fully opaque.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Larger, more visible markers
+            >>> plot.set_edge_activity_style(width=0.9, height=0.6, alpha=0.5)
+            >>>
+            >>> # Smaller, subtle markers
+            >>> plot.set_edge_activity_style(width=0.5, height=0.2, alpha=0.3)
+            >>>
+            >>> # Square markers
+            >>> plot.set_edge_activity_style(width=0.5, height=0.5)
+        """
+        if not 0.0 <= width <= 1.0:
+            raise ValueError(f"width must be between 0.0 and 1.0, got {width}")
+        if not 0.0 <= height <= 1.0:
+            raise ValueError(f"height must be between 0.0 and 1.0, got {height}")
+        if alpha is not None and not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"alpha must be between 0.0 and 1.0, got {alpha}")
+
+        self.edge_activity_width = width
+        self.edge_activity_height = height
+        if alpha is not None:
+            self.edge_activity_alpha = alpha
+        return self
+
+    def toggle_nodes(self, show: bool = True) -> "LongitudinalModulesPlot":
+        """
+        Control whether to display nodes.
+
+        Args:
+            show: Whether to show nodes.
+
+        Returns:
+            Self for method chaining.
+        """
+        self._show_nodes = show
+        return self
+
+    def auto_node_ordering(
+        self, enable: bool = True, subsets: list = []
+    ) -> "LongitudinalModulesPlot":
+        """
+        Enable/disable automatic node ordering.
+
+        When enabled, nodes are automatically reordered to minimize edge crossings.
+
+        Args:
+            enable: Whether to enable automatic node ordering.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.auto_nodes_ordering = enable
+        self.auto_nodes_ordering_subsets = subsets
+        return self
+
+    def set_monochrome(self, enable: bool = True) -> "LongitudinalModulesPlot":
+        """
+        Enable/disable monochrome color scheme.
+
+        Args:
+            enable: Whether to use monochrome colors.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.monochrome = enable
+        return self
+
+    def trim_node_timelines(self, enable: bool = True) -> "LongitudinalModulesPlot":
+        """
+        Enable/disable trimming of node timelines.
+
+        When enabled, node lines are trimmed to their active time range.
+
+        Args:
+            enable: Whether to trim node timelines.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.trim = enable
+        return self
+
+    def set_color_palette(self, palette: str | Sequence[Any]) -> "LongitudinalModulesPlot":
+        """
+        Set the color palette for community visualization.
+
+        Args:
+            palette: Color palette specification. Can be:
+                - str: Name of a matplotlib colormap (e.g., 'viridis', 'tab10', 'Set2',
+                       'Pastel1', 'Paired', 'tab20', 'Dark2', 'Accent')
+                - Sequence of colors: List/tuple of color specifications
+                  (hex strings like '#FF5733', RGB tuples like (0.5, 0.5, 0.5),
+                  or named colors like 'red', 'blue')
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Using a matplotlib colormap name
+            >>> plot.set_color_palette('tab10')
+            >>> plot.set_color_palette('viridis')
+            >>> plot.set_color_palette('Set2')
+            >>>
+            >>> # Using custom colors
+            >>> plot.set_color_palette(['red', 'blue', 'green'])
+            >>> plot.set_color_palette(['#FF5733', '#33FF57', '#3357FF'])
+            >>> plot.set_color_palette([(0.9, 0.1, 0.1), (0.1, 0.9, 0.1)])
+        """
+        self.color_palette = palette
+        return self
+
+    def set_edge_style(
+        self,
+        alpha: float = DEFAULT_EDGE_ALPHA,
+        flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR,
+        color: bool = False,
+        orientation: bool = False,
+        weight_scale: float = DEFAULT_WEIGHT_SCALE,
+        width_scale: float | None = None,
+        curve_intensity: float | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure edge visualization style.
+
+        Args:
+            alpha: Edge transparency (0.0 to 1.0).
+            flatten_factor: Flattening factor for edge arcs.
+            color: Whether to color edges by community.
+            orientation: Whether to show edge orientation arrows for directed graphs.
+            weight_scale: Scale factor for edge weights.
+            width_scale: Scale for edge width (0.0 to 1.0). Controls how much of the
+                time unit width an edge fills. At 0, edges are invisible. At 1, consecutive
+                edges at t and t+1 touch with no gap between them. Default is 0.3.
+            curve_intensity: For delayed linkstreams, controls how much edges curve.
+                0.0 = straight lines, positive values curve right, negative values curve left.
+                Typical values are between -0.3 and 0.3. Default is 0.0.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ValueError: If alpha or width_scale is not in range [0.0, 1.0].
+
+        Example:
+            >>> # Make edges thicker (fill more of time unit)
+            >>> plot.set_edge_style(width_scale=0.8)
+            >>>
+            >>> # Curve delayed edges slightly to the right
+            >>> plot.set_edge_style(curve_intensity=0.2)
+            >>>
+            >>> # Curve delayed edges more strongly to the right
+            >>> plot.set_edge_style(curve_intensity=0.5)
+            >>>
+            >>> # Curve delayed edges to the left
+            >>> plot.set_edge_style(curve_intensity=-0.2)
+        """
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"alpha must be between 0.0 and 1.0, got {alpha}")
+        if width_scale is not None and not 0.0 <= width_scale <= 1.0:
+            raise ValueError(f"width_scale must be between 0.0 and 1.0, got {width_scale}")
+        self.edge_alpha = alpha
+        self.edge_flatten_factor = flatten_factor
+        self.color_edges = color
+        self.show_edge_orientation = orientation
+        self.weight_scale = weight_scale
+        if width_scale is not None:
+            self.edge_width_scale = width_scale
+        if curve_intensity is not None:
+            self.edge_curve_intensity = curve_intensity
+        return self
+
+    def set_community_style(
+        self,
+        height: float | None = None,
+        max_shown: int | None = None,
+        hide_self: bool | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure community visualization style.
+
+        Args:
+            height: Height of community rectangles (0.0 to 1.0).
+            max_shown: Maximum number of communities to show (-1 for all).
+                When using focus with show_unfocused=True, this limits the
+                total number of displayed communities (focused + unfocused).
+            hide_self: Whether to hide single-node communities.
+
+        Returns:
+            Self for method chaining.
+        """
+        if height is not None:
+            self.height_community_color = height
+        if max_shown is not None:
+            self.max_shown_communities = max_shown
+        if hide_self is not None:
+            self.hide_self_communities = hide_self
+        return self
+
+    def set_background_community_color(self, color: Any) -> "LongitudinalModulesPlot":
+        """
+        Set the color for Tier 3 (background) communities.
+
+        Tier 3 communities are those that are neither focused (Tier 1) nor
+        secondary (Tier 2). By default, they are displayed in gainsboro (light grey).
+
+        Note: This sets the color for background *communities*, not the plot canvas
+        background. For plot background, use matplotlib's `ax.set_facecolor()`.
+
+        Args:
+            color: The color to use for background communities. Can be:
+                - Named color: 'gainsboro', 'lightgrey', 'white', 'lavender', etc.
+                - Hex string: '#DCDCDC', '#F0F0F0', etc.
+                - RGB tuple: (0.86, 0.86, 0.86), (0.9, 0.9, 0.95), etc.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Use a lighter grey for background communities
+            >>> plot.set_background_community_color('whitesmoke')
+            >>>
+            >>> # Use a custom grey with hex
+            >>> plot.set_background_community_color('#E8E8E8')
+            >>>
+            >>> # Use an RGB tuple
+            >>> plot.set_background_community_color((0.9, 0.9, 0.9))
+            >>>
+            >>> # Use a subtle color tint
+            >>> plot.set_background_community_color('lavender')
+        """
+        self.background_color = color
+        return self
+
+    def set_unfocused_style(
+        self,
+        show: bool = True,
+        style: str = "transparent",
+        intensity: float = 0.3,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure how non-focused communities (Tier 2) are displayed.
+
+        When using set_focus_communities() or set_focus_nodes(), you can choose
+        to still display the other communities with a de-emphasized visual style.
+
+        Args:
+            show: Whether to show unfocused communities (default: True).
+            style: Visual style for unfocused communities. Options:
+                - "transparent": Same colors but with reduced alpha (semi-transparent)
+                - "grey": Display in grey/gainsboro color (no differentiation)
+                - "desaturated": Display with desaturated (greyed-out) versions of colors
+                - "lighter": Display with lighter/pastel versions of their colors
+            intensity: Controls the de-emphasis intensity (0.0 to 1.0). Default is 0.3.
+                - For "transparent": alpha value (0=invisible, 1=fully opaque)
+                - For "desaturated": desaturation factor (0=no change, 1=fully grey)
+                - For "lighter": lightening factor (0=no change, 1=fully white)
+                - For "grey": ignored (always uses gainsboro)
+                Lower values = closer to Tier 1 (more visible)
+                Higher values = closer to Tier 3 (less visible)
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Semi-transparent secondary tier (subtle visibility)
+            >>> plot.set_unfocused_style(show=True, style='transparent', intensity=0.3)
+            >>>
+            >>> # More visible secondary tier
+            >>> plot.set_unfocused_style(show=True, style='desaturated', intensity=0.2)
+            >>>
+            >>> # Very de-emphasized secondary tier
+            >>> plot.set_unfocused_style(show=True, style='lighter', intensity=0.7)
+            >>>
+            >>> # Hide unfocused communities completely
+            >>> plot.set_unfocused_style(show=False)
+        """
+        valid_styles = {"transparent", "grey", "desaturated", "lighter"}
+        if style not in valid_styles:
+            raise ValueError(f"Invalid style '{style}'. Must be one of: {', '.join(valid_styles)}")
+        if not 0.0 <= intensity <= 1.0:
+            raise ValueError(f"intensity must be between 0.0 and 1.0, got {intensity}")
+
+        self.show_unfocused_communities = show
+        self.unfocused_style = style
+        self.unfocused_alpha = intensity  # Keep internal name for compatibility
+        return self
+
+    def set_node_style(
+        self,
+        alpha: float = DEFAULT_NODE_ALPHA,
+        fontsize: int = DEFAULT_NODE_LABEL_FONT_SIZE,
+        padding: int = DEFAULT_NODE_LABEL_PADDING,
+        linewidth: float | None = None,
+        linewidth_focus: float | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure node visualization style.
+
+        Args:
+            alpha: Node transparency (0.0 to 1.0).
+            fontsize: Node label font size.
+            padding: Node label padding.
+            linewidth: Line width for regular (non-focused) node lines. Default 0.25.
+            linewidth_focus: Line width for focused node lines. Default 0.5.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Thicker node lines
+            >>> plot.set_node_style(linewidth=0.5, linewidth_focus=1.0)
+            >>>
+            >>> # Thinner node lines
+            >>> plot.set_node_style(linewidth=0.1, linewidth_focus=0.3)
+        """
+        self.node_alpha = alpha
+        self.node_label_fontsize = fontsize
+        self.node_labels_padding = padding
+        if linewidth is not None:
+            self.node_linewidth = linewidth
+        if linewidth_focus is not None:
+            self.node_linewidth_focus = linewidth_focus
+        return self
+
+    def set_labels(
+        self,
+        display_xticks: bool = False,
+        display_yticks: bool = False,
+        display_xlabel: bool = True,
+        display_ylabel: bool = True,
+        font_size: int = DEFAULT_LABEL_FONT_SIZE,
+        bold_labels: list[str] | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure label display.
+
+        Args:
+            display_xticks: Whether to display x-axis tick labels.
+            display_yticks: Whether to display y-axis tick labels.
+            display_xlabel: Whether to display x-axis label.
+            display_ylabel: Whether to display y-axis label.
+            font_size: Axis label font size.
+            bold_labels: List of labels to display in bold.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.display_xticks_labels = display_xticks
+        self.display_yticks_labels = display_yticks
+        self.display_xlabel = display_xlabel
+        self.display_ylabel = display_ylabel
+        self.label_font_size = font_size
+        if bold_labels:
+            self.bold_labels = bold_labels
+        return self
+
+    def set_axis_padding(
+        self,
+        bottom: float = 0.0,
+        top: float | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Set padding (blank space) at top and bottom of the y-axis.
+
+        Args:
+            bottom: Padding at the bottom of y-axis in node units. Default 0.0.
+                Use positive values to add blank space below the first node.
+            top: Padding at the top of y-axis in node units. Default None.
+                If None, uses the same value as bottom (symmetric padding).
+                Use positive values to add blank space above the last node.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Symmetric padding at top/bottom
+            >>> plot.set_axis_padding(0.5)  # 0.5 on both sides
+            >>>
+            >>> # Different padding for top and bottom
+            >>> plot.set_axis_padding(bottom=0.5, top=1.0)
+            >>>
+            >>> # More padding at top only
+            >>> plot.set_axis_padding(bottom=0.0, top=1.5)
+            >>>
+            >>> # No padding (tight)
+            >>> plot.set_axis_padding(0.0)
+        """
+        self.y_padding_bottom = bottom
+        self.y_padding_top = top if top is not None else bottom
+        return self
+
+    # =========================================================================
+    # SIMPLIFIED API - Consolidated Configuration Methods
+    # =========================================================================
+
+    def configure_nodes(
+        self,
+        nodes: set[NodeId] | list[NodeId] | None = None,
+        labels: list[str] | None = None,
+        show_labels: bool = True,
+        auto_ordering: bool = False,
+        ordering_subsets: list[list[NodeId]] | None = None,
+        longitudinal_margin: float = 0,
+        alpha: float = DEFAULT_NODE_ALPHA,
+        fontsize: int = DEFAULT_NODE_LABEL_FONT_SIZE,
+        label_padding: int = DEFAULT_NODE_LABEL_PADDING,
+        linewidth: float = 0.25,
+        linewidth_focus: float = 0.5,
+        highlight_focus: bool = True,
+        bold_labels: list[str] | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure all node-related settings in one call.
+
+        This is a simplified API that consolidates:
+        - set_nodes()
+        - auto_node_ordering()
+        - set_node_style()
+
+        Note: Node focus for community coloring should be set via configure_communities(focus_nodes=...).
+
+        Args:
+            nodes: Set or list of nodes to display. If None, uses all nodes from linkstream.
+                If a list, the order is preserved for display.
+            labels: Optional list of labels for nodes.
+            show_labels: Whether to display node labels on the y-axis. Default True.
+            auto_ordering: Whether to enable automatic node ordering to minimize edge crossings.
+            ordering_subsets: Optional list of node subsets for constrained ordering.
+            longitudinal_margin: Margin for longitudinal nodes display.
+            alpha: Node transparency (0.0 to 1.0).
+            fontsize: Node label font size.
+            label_padding: Node label padding.
+            linewidth: Line width for regular (non-focused) node lines.
+            linewidth_focus: Line width for focused node lines.
+            highlight_focus: Whether to highlight focused nodes.
+            bold_labels: List of labels to display in bold.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> plot.configure_nodes(
+            ...     nodes=node_list,
+            ...     labels=label_list,
+            ...     show_labels=True,
+            ...     auto_ordering=True,
+            ...     fontsize=8,
+            ...     label_padding=-15,
+            ...     linewidth=0.3,
+            ... )
+        """
+        # Set nodes (without focus - focus is handled in configure_communities)
+        self.set_nodes(
+            nodes=nodes,
+            labels=labels,
+            longitudinal_nodes_margin=longitudinal_margin,
+        )
+
+        # Configure ordering
+        self.auto_node_ordering(enable=auto_ordering, subsets=ordering_subsets or [])
+
+        # Set node style
+        self.set_node_style(
+            alpha=alpha,
+            fontsize=fontsize,
+            padding=label_padding,
+            linewidth=linewidth,
+            linewidth_focus=linewidth_focus,
+        )
+
+        # Focus-related settings (visual highlighting when focus is set via configure_communities)
+        self.highlight_node_focus = highlight_focus
+        if bold_labels:
+            self.bold_labels = bold_labels
+
+        # Display node labels on y-axis
+        self.display_yticks_labels = show_labels
+
+        return self
+
+    def configure_edges(
+        self,
+        show_edges: bool = False,
+        show_activity: bool = True,
+        # Edge style parameters
+        edge_alpha: float = DEFAULT_EDGE_ALPHA,
+        edge_flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR,
+        edge_color: bool = False,
+        edge_orientation: bool = False,
+        edge_weight_scale: float = DEFAULT_WEIGHT_SCALE,
+        edge_width_scale: float = 0.3,
+        edge_curve_intensity: float = 0.0,
+        # Activity marker parameters
+        activity_width: float = 0.8,
+        activity_height: float = 0.4,
+        activity_alpha: float | None = None,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure all edge-related settings in one call.
+
+        This is a simplified API that consolidates:
+        - toggle_edges()
+        - toggle_edge_activity()
+        - set_edge_style()
+        - set_edge_activity_style()
+
+        Args:
+            show_edges: Whether to show edges (arcs between nodes).
+            show_activity: Whether to show edge activity markers (rectangles at node positions).
+
+            Edge style parameters:
+            edge_alpha: Edge transparency (0.0 to 1.0).
+            edge_flatten_factor: Flattening factor for edge arcs.
+            edge_color: Whether to color edges by community.
+            edge_orientation: Whether to show edge orientation arrows for directed graphs.
+            edge_weight_scale: Scale factor for edge weights.
+            edge_width_scale: Scale for edge width (0.0 to 1.0).
+            edge_curve_intensity: For delayed linkstreams, controls edge curvature.
+
+            Activity marker parameters:
+            activity_width: Width of edge activity rectangles (0.0 to 1.0).
+            activity_height: Height of edge activity rectangles (0.0 to 1.0).
+            activity_alpha: Alpha for activity markers. If None, uses edge_alpha.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Show only edge activity markers (common pattern)
+            >>> plot.configure_edges(
+            ...     show_edges=False,
+            ...     show_activity=True,
+            ...     activity_width=0.9,
+            ...     activity_height=0.5,
+            ...     activity_alpha=0.3,
+            ... )
+            >>>
+            >>> # Show both edges and activity
+            >>> plot.configure_edges(
+            ...     show_edges=True,
+            ...     show_activity=True,
+            ...     edge_alpha=0.15,
+            ...     edge_flatten_factor=5,
+            ... )
+        """
+        # Toggle display
+        self.toggle_edges(show_edges)
+        self.toggle_edge_activity(show_activity)
+
+        # Set edge style
+        self.set_edge_style(
+            alpha=edge_alpha,
+            flatten_factor=edge_flatten_factor,
+            color=edge_color,
+            orientation=edge_orientation,
+            weight_scale=edge_weight_scale,
+            width_scale=edge_width_scale,
+            curve_intensity=edge_curve_intensity,
+        )
+
+        # Set activity style
+        self.set_edge_activity_style(
+            width=activity_width,
+            height=activity_height,
+            alpha=activity_alpha if activity_alpha is not None else edge_alpha,
+        )
+
+        return self
+
+    def configure_communities(
+        self,
+        communities: Communities,
+        max_shown: int = -1,
+        hide_self: bool = False,
+        margin_segment: float = 0.25,
+        height: float = DEFAULT_COMMUNITY_HEIGHT,
+        # Color configuration
+        color_palette: str | Sequence[Any] | None = None,
+        background_color: Any = DEFAULT_BACKGROUND_COMMUNITY_COLOR,
+        monochrome: bool = False,
+        # Focus configuration
+        focus_communities: list[Any] | dict[Any, Any] | None = None,
+        focus_nodes: list[NodeId] | None = None,
+        # Unfocused style
+        show_unfocused: bool = False,
+        unfocused_style: str = "transparent",
+        unfocused_intensity: float = 0.3,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure all community-related settings in one call.
+
+        This is a simplified API that consolidates:
+        - set_communities()
+        - set_community_style()
+        - set_color_palette()
+        - set_background_community_color()
+        - set_monochrome()
+        - set_focus_communities()
+        - set_unfocused_style()
+
+        Note: You can specify either focus_communities OR focus_nodes, but not both.
+
+        Args:
+            communities: Dictionary mapping community labels to list of (node, time) tuples.
+            max_shown: Maximum number of communities to show (-1 for all).
+            hide_self: Whether to hide single-node communities.
+            margin_segment: Margin between community segments.
+            height: Height of community rectangles (0.0 to 1.0).
+
+            Color configuration:
+            color_palette: Color palette (matplotlib colormap name or list of colors).
+            background_color: Color for Tier 3 (background) communities.
+            monochrome: Whether to use monochrome color scheme.
+
+            Focus configuration:
+            focus_communities: List of community labels to focus, or dict mapping labels to colors.
+            focus_nodes: List of node indices to focus on (alternative to focus_communities).
+
+            Unfocused style:
+            show_unfocused: Whether to show unfocused communities.
+            unfocused_style: Style for unfocused communities ('transparent', 'grey', 'desaturated', 'lighter').
+            unfocused_intensity: De-emphasis intensity (0.0 to 1.0).
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ValueError: If both focus_communities and focus_nodes are specified.
+
+        Example:
+            >>> # Basic usage with auto-assigned colors
+            >>> plot.configure_communities(
+            ...     communities=dynamic_communities,
+            ...     max_shown=10,
+            ...     color_palette="tab20",
+            ...     height=0.75,
+            ... )
+            >>>
+            >>> # With focused communities and custom colors
+            >>> plot.configure_communities(
+            ...     communities=dynamic_communities,
+            ...     focus_communities={'com_1': 'red', 'com_2': 'blue'},
+            ...     show_unfocused=True,
+            ...     unfocused_style='lighter',
+            ...     unfocused_intensity=0.5,
+            ... )
+        """
+        if focus_communities is not None and focus_nodes is not None:
+            raise ValueError(
+                "Cannot specify both focus_communities and focus_nodes. Use one or the other."
+            )
+
+        # Set communities
+        self.set_communities(
+            communities=communities,
+            max_shown=max_shown,
+            hide_self=hide_self,
+            margin_commu_segment=margin_segment,
+        )
+
+        # Set community style
+        self.set_community_style(height=height)
+
+        # Set color configuration
+        if color_palette is not None:
+            self.set_color_palette(color_palette)
+        self.set_background_community_color(background_color)
+        self.set_monochrome(monochrome)
+
+        # Set focus (reset any previous focus first)
+        self.node_focus = []
+        self.community_focus = []
+        self._community_focus_colors = {}
+
+        if focus_communities is not None:
+            self.set_focus_communities(focus_communities)
+        elif focus_nodes is not None:
+            self.set_focus_nodes(focus_nodes)
+
+        # Set unfocused style
+        self.set_unfocused_style(
+            show=show_unfocused,
+            style=unfocused_style,
+            intensity=unfocused_intensity,
+        )
+
+        return self
+
+    def configure_display(
+        self,
+        # Axis padding
+        padding_bottom: float = 0.0,
+        padding_top: float | None = None,
+        # Axis labels (not node labels - use configure_nodes(show_labels=...) for that)
+        show_xlabel: bool = False,
+        show_ylabel: bool = False,
+        show_xticks: bool = False,
+        label_fontsize: int = DEFAULT_LABEL_FONT_SIZE,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Configure global display settings in one call.
+
+        This is a simplified API that consolidates:
+        - set_axis_padding()
+        - set_labels() (for axis labels only)
+
+        Note: Node labels on y-axis are controlled by configure_nodes(show_labels=...).
+
+        Args:
+            Axis padding:
+            padding_bottom: Padding at the bottom of y-axis in node units.
+            padding_top: Padding at the top of y-axis. If None, uses padding_bottom.
+
+            Axis labels:
+            show_xlabel: Whether to display x-axis label ("Time").
+            show_ylabel: Whether to display y-axis label ("Nodes").
+            show_xticks: Whether to display x-axis tick labels (time values).
+            label_fontsize: Axis label font size.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> plot.configure_display(
+            ...     padding_bottom=0.5,
+            ...     padding_top=1.0,
+            ...     show_xlabel=True,  # Show "Time" label
+            ...     show_ylabel=False,
+            ... )
+        """
+        # Set axis padding
+        self.set_axis_padding(bottom=padding_bottom, top=padding_top)
+
+        # Set axis labels (not node labels - those are controlled by configure_nodes)
+        self.display_xlabel = show_xlabel
+        self.display_ylabel = show_ylabel
+        self.display_xticks_labels = show_xticks
+        self.label_font_size = label_fontsize
+
+        return self
+
+    @overload
+    def draw(
+        self,
+        title: str = ...,
+        *,
+        return_ax: Literal[True],
+        show_plot: bool = ...,
+    ) -> tuple[Figure, Axes]: ...
+
+    @overload
+    def draw(
+        self,
+        title: str = ...,
+        *,
+        return_ax: Literal[False] = ...,
+        show_plot: bool = ...,
+    ) -> Figure: ...
+
+    def draw(
+        self,
+        title: str = "",
+        return_ax: bool = False,
+        show_plot: bool = False,
+    ) -> Figure | tuple[Figure, Axes]:
+        """
+        Draw the longitudinal community plot.
+
+        Args:
+            title: Plot title.
+            return_ax: Whether to return the axes object along with figure.
+            show_plot: Whether to display the plot immediately.
+
+        Returns:
+            Figure object, or tuple of (Figure, Axes) if return_ax is True.
+
+        Raises:
+            ValueError: If communities are not configured before drawing.
+        """
+        # Validate and prepare data
+        self._validate_configuration()
+        self._prepare_data()
+
+        # Set up figure and axes
+        self._fig, self._ax = setup_figure_and_axes(self.width, self.height)
+        self._drawn = True
+
+        # Apply all drawing operations
+        self._draw_community_periods()
+        self._draw_nodes()
+        self._draw_focus_highlights()
+        self._draw_edges()
+        self._draw_edge_activity()
+        self._draw_night_highlights()
+
+        # Configure axes and finalize
+        self._configure_axes()
+        self._finalize_plot(title, show_plot)
+
+        if return_ax:
+            return self._fig, self._ax
+        return self._fig
+
+    def save(
+        self, filename: str, dpi: int = 300, bbox_inches: str = "tight"
+    ) -> "LongitudinalModulesPlot":
+        """
+        Save the plot to a file.
+
+        Args:
+            filename: Output filename (path).
+            dpi: Dots per inch resolution.
+            bbox_inches: Bounding box setting ('tight' for tight layout).
+
+        Returns:
+            Self for method chaining.
+        """
+        if not self._drawn:
+            self.draw()
+        if self._fig is not None:
+            self._fig.savefig(filename, dpi=dpi, bbox_inches=bbox_inches)
+        return self
+
+    def show(self) -> "LongitudinalModulesPlot":
+        """
+        Display the plot.
+
+        Returns:
+            Self for method chaining.
+        """
+        if not self._drawn:
+            self.draw(show_plot=True)
+        else:
+            plt.show()
+        return self
+
+    def get_figure(self) -> Figure:
+        """
+        Get the matplotlib figure object.
+
+        Returns:
+            The matplotlib Figure object.
+
+        Raises:
+            RuntimeError: If the plot has not been drawn yet.
+        """
+        if not self._drawn:
+            self.draw()
+        if self._fig is None:
+            raise RuntimeError("Figure not created")
+        return self._fig
+
+    def get_axes(self) -> Axes:
+        """
+        Get the matplotlib axes object.
+
+        Returns:
+            The matplotlib Axes object.
+
+        Raises:
+            RuntimeError: If the plot has not been drawn yet.
+        """
+        if not self._drawn:
+            self.draw()
+        if self._ax is None:
+            raise RuntimeError("Axes not created")
+        return self._ax
+
+    def get_node_order(self) -> list[NodeId]:
+        """
+        Get the original node IDs in their display order.
+
+        This returns the raw node IDs (as they appear in the original data)
+        sorted by their display position. This is useful when you want to
+        reuse the same node ordering computed by auto_node_ordering() in
+        another LongitudinalPlot instance.
+
+        Returns:
+            List of original node IDs in display order (from top to bottom).
+
+        Raises:
+            RuntimeError: If no node mapping has been computed yet.
+
+        Example:
+            >>> # Compute ordering on first plot
+            >>> plot1 = LongitudinalPlot(linkstream1)
+            >>> plot1.set_communities(communities1)
+            >>> plot1.auto_node_ordering(True)
+            >>> plot1.draw()
+            >>>
+            >>> # Get the computed node order
+            >>> node_order = plot1.get_node_order()
+            >>>
+            >>> # Apply same ordering to second plot
+            >>> plot2 = LongitudinalPlot(linkstream2)
+            >>> plot2.set_nodes(node_order)  # Uses this order directly
+            >>> plot2.auto_node_ordering(False)  # Don't recompute
+            >>> plot2.set_communities(communities2)
+            >>> plot2.draw()
+        """
+        if self._nodes_mapping is None:
+            if not self._drawn:
+                self._validate_configuration()
+                self._prepare_data()
+
+        if self._nodes_mapping is None:
+            raise RuntimeError("Node mapping not computed")
+
+        # Invert the mapping: {original_id: display_index} -> {display_index: original_id}
+        inverted = {
+            display_idx: original_id for original_id, display_idx in self._nodes_mapping.items()
+        }
+
+        # Return original IDs sorted by display index
+        return [inverted[i] for i in sorted(inverted.keys())]
+
+    def _validate_configuration(self) -> None:
+        """
+        Validate that required data is configured.
+
+        Raises:
+            ValueError: If required configuration is missing.
+        """
+        if self.communities is None:
+            raise ValueError("Communities must be set before drawing")
+        if self.nodes is None:
+            self.nodes = self.linkstream.nodes
+
+    def _prepare_data(self) -> None:
+        """Prepare data for visualization."""
+        # Create nodes mapping like the original function does
+        # If an ordered list was provided via set_nodes(), use that order
+        # Otherwise use the set (arbitrary order)
+        if self._nodes_ordered_list is not None:
+            nodes_to_display_ordered = self._nodes_ordered_list
+        else:
+            nodes_to_display_ordered = list(self.nodes if self.nodes else self.linkstream.nodes)
+        nodes_to_display_set = set(nodes_to_display_ordered)
+
+        nodes_mapping: NodesMapping = {
+            node: ite for ite, node in enumerate(nodes_to_display_ordered)
+        }
+
+        # Apply auto node ordering if enabled
+        if self.auto_nodes_ordering and self.communities is not None:
+            from .core import _auto_node_ordering_given_time_modules
+
+            time_links = self.linkstream.get_time_links()
+            if self.auto_nodes_ordering_subsets == []:
+                self.auto_nodes_ordering_subsets = [nodes_to_display_set]
+            else:
+                self.auto_nodes_ordering_subsets = [
+                    set(subset) & nodes_to_display_set
+                    for subset in self.auto_nodes_ordering_subsets
+                ]
+            nodes_mapping = _auto_node_ordering_given_time_modules(
+                self.communities,
+                [] if not self._show_edges else time_links,
+                1 if not self._show_edges else 0.9,
+                self.auto_nodes_ordering_subsets,
+            )
+
+            # Note: We do NOT extend the mapping to include nodes not in communities
+            # because those nodes don't have community data and would show edge activity
+            # without any community color coverage. This keeps communities and edge activity aligned.
+
+        # ALWAYS remap node labels if they exist (not just when auto_nodes_ordering)
+        # This ensures labels match the display indices for all cases
+        # Use _original_node_labels to avoid corruption when _prepare_data is called multiple times
+        if self.node_labels or self._original_node_labels:
+            # Save original labels on first call, use them for all subsequent remapping
+            if self._original_node_labels is None:
+                self._original_node_labels = list(self.node_labels)
+
+            original_labels = self._original_node_labels
+            self.node_labels = [""] * len(nodes_mapping)
+            # If we have an ordered list, use it to pair labels with node IDs
+            # Otherwise fall back to sequential indices
+            if self._nodes_ordered_list is not None and len(original_labels) == len(
+                self._nodes_ordered_list
+            ):
+                for node_id, label in zip(self._nodes_ordered_list, original_labels):
+                    if node_id in nodes_mapping:
+                        self.node_labels[nodes_mapping[node_id]] = label
+            else:
+                # Fallback: assume labels are indexed sequentially 0, 1, 2, ...
+                for node, label in enumerate(original_labels):
+                    if node in nodes_mapping:
+                        self.node_labels[nodes_mapping[node]] = label
+
+        # ALWAYS remap node focus (not just when auto_nodes_ordering)
+        if self.node_focus:
+            self.node_focus = [
+                nodes_mapping[nfo] for nfo in self.node_focus if nfo in nodes_mapping
+            ]
+
+        # Store the final nodes_to_display list with mapped indices
+        # Only include nodes that are in the mapping
+        self.nodes_to_display = [
+            nodes_mapping[node] for node in nodes_to_display_set if node in nodes_mapping
+        ]
+        self._nodes_mapping = nodes_mapping
+
+        # Remap communities
+        communities_dict = self.communities if self.communities is not None else {}
+        self._remapped_communities = {
+            key: [(nodes_mapping.get(node, -1), time) for node, time in elems]
+            for key, elems in communities_dict.items()
+        }
+
+        # THREE-TIER COMMUNITY SYSTEM:
+        # 1. Primary/Focused: specified communities with full-color visibility
+        # 2. Secondary: biggest remaining communities until max_shown, de-emphasized colors
+        # 3. Background: all remaining communities in gainsboro
+
+        # Step 1: Determine primary/focused communities
+        if self.community_focus:
+            # Use community labels directly to determine focused communities
+            focus_labels_set = set(self.community_focus)
+            self._focused_communities = {
+                label: members
+                for label, members in self._remapped_communities.items()
+                if label in focus_labels_set
+            }
+            remaining_communities = {
+                label: members
+                for label, members in self._remapped_communities.items()
+                if label not in focus_labels_set
+            }
+        else:
+            # Use node_focus and time_focus to determine focused communities
+            self._focused_communities, remaining_communities = prepare_communities_for_display(
+                self._remapped_communities, self.node_focus, self.time_focus, False
+            )
+
+        # Step 2: From remaining, split into secondary (with colors) and background (gainsboro)
+        self._secondary_communities = {}
+        self._background_communities = {}
+
+        if self.show_unfocused_communities and remaining_communities:
+            # Sort remaining by size (descending)
+            remaining_sorted = sorted(
+                remaining_communities.items(),
+                key=lambda x: len(x[1]),
+                reverse=True,
+            )
+
+            # Determine how many secondary slots we have
+            if self.max_shown_communities > -1:
+                # max_shown includes both primary and secondary
+                secondary_slots = max(
+                    0, self.max_shown_communities - len(self._focused_communities)
+                )
+            else:
+                # No limit - all remaining become secondary (colored but de-emphasized)
+                secondary_slots = len(remaining_sorted)
+
+            # Split into secondary (colored, de-emphasized) and background (gainsboro)
+            self._secondary_communities = dict(remaining_sorted[:secondary_slots])
+            self._background_communities = dict(remaining_sorted[secondary_slots:])
+        else:
+            # Not showing unfocused - all remaining go to background
+            self._background_communities = remaining_communities
+
+        # If max_shown also limits primary communities, apply that
+        if self.max_shown_communities > -1:
+            focused_sorted = sorted(
+                self._focused_communities.items(),
+                key=lambda x: len(x[1]),
+                reverse=True,
+            )
+            if len(focused_sorted) > self.max_shown_communities:
+                # Move excess focused to background
+                self._focused_communities = dict(focused_sorted[: self.max_shown_communities])
+                excess = dict(focused_sorted[self.max_shown_communities :])
+                self._background_communities.update(excess)
+                self._secondary_communities = {}
+
+        # Apply hide_self_communities filter (communities with single member)
+        if self.hide_self_communities:
+            self._focused_communities = {
+                label: members
+                for label, members in self._focused_communities.items()
+                if len(members) > 1
+            }
+            self._secondary_communities = {
+                label: members
+                for label, members in self._secondary_communities.items()
+                if len(members) > 1
+            }
+            self._background_communities = {
+                label: members
+                for label, members in self._background_communities.items()
+                if len(members) > 1
+            }
+
+        # Get and remap time links - ALWAYS remap using nodes_mapping
+        # to ensure consistency with remapped communities
+        time_links = self.linkstream.get_time_links()
+
+        # Check for nodes in linkstream that are not in the display set
+        # and emit a warning if found
+        import warnings
+
+        unmapped_nodes: set[NodeId] = set()
+        for node1, node2, *rest in time_links:
+            if node1 not in nodes_mapping:
+                unmapped_nodes.add(node1)
+            if node2 not in nodes_mapping:
+                unmapped_nodes.add(node2)
+
+        if unmapped_nodes:
+            warnings.warn(
+                f"The linkstream contains nodes that are not in the set_nodes() list: {sorted(unmapped_nodes)}. "
+                f"Edges involving these nodes will be drawn at incorrect positions (y=-1). "
+                f"Fix this by either: (1) adding these nodes to set_nodes(), or "
+                f"(2) filtering the linkstream to only include edges between known nodes.",
+                UserWarning,
+            )
+
+        time_links = [
+            [nodes_mapping.get(node1, -1), nodes_mapping.get(node2, -1), *rest]
+            for node1, node2, *rest in time_links
+        ]
+        self._time_links = time_links
+
+        # Calculate node time ranges using mapped node indices
+        self._start_nodes, self._end_nodes = calculate_node_time_ranges(
+            list(nodes_mapping.values()),
+            time_links,
+            self.linkstream.network_duration,
+            self.trim,
+        )
+
+        # Create time-node to community mapping using remapped communities
+        self._time_node_community_mapping = create_time_node_community_mapping(
+            self._remapped_communities
+        )
+
+        # Generate THREE-TIER color mapping:
+        # 1. Primary (focused): full-color from palette
+        # 2. Secondary: de-emphasized colors (using unfocused_style)
+        # 3. Background: gainsboro
+        self._color_mapping = generate_color_mapping(
+            self._focused_communities,
+            self._secondary_communities,
+            self.monochrome,
+            self.color_palette,
+            unfocused_style=self.unfocused_style,
+            unfocused_alpha=self.unfocused_alpha,
+        )
+
+        # Add background color for all background communities (Tier 3)
+        for label in self._background_communities:
+            self._color_mapping[label] = self.background_color
+
+        # Apply explicit colors from community_focus if provided
+        if self._community_focus_colors:
+            for label, color in self._community_focus_colors.items():
+                if label in self._color_mapping:
+                    self._color_mapping[label] = color
+
+    def _auto_node_ordering(self) -> NodesMapping:
+        """
+        Apply automatic node ordering.
+
+        Returns:
+            Dictionary mapping original node IDs to display indices.
+        """
+        from .core import _auto_node_ordering_given_time_modules
+
+        time_links = self.linkstream.get_time_links()
+        nodes_set: set[NodeId] = (
+            set(self.nodes_to_display) if self.nodes_to_display else set(self.linkstream.nodes)
+        )
+        communities_dict = self.communities if self.communities is not None else {}
+
+        if self.auto_nodes_ordering_subsets == []:
+            self.auto_nodes_ordering_subsets = [nodes_set]
+        else:
+            self.auto_nodes_ordering_subsets = [
+                set(subset) & nodes_set for subset in self.auto_nodes_ordering_subsets
+            ]
+        return _auto_node_ordering_given_time_modules(
+            communities_dict,
+            [] if not self._show_edges else time_links,
+            1 if not self._show_edges else 0.9,
+            self.auto_nodes_ordering_subsets,
+        )
+
+    def _create_communities_nodes_segments(self) -> CommunityNodesSegments:
+        """
+        Create communities nodes segments for optimized drawing.
+
+        Uses TimeModules.get_time_modules_dict() for efficient segment extraction.
+
+        Returns:
+            Dictionary mapping community labels to node time segments.
+
+        Raises:
+            ValueError: If TimeModules object is not available.
+        """
+        if self._original_time_modules is None:
+            raise ValueError(
+                "TimeModules object required but not available. "
+                "Ensure set_communities() was called with a TimeModules object."
+            )
+
+        # Determine which community labels to include (respects max_shown, hide_self, etc.)
+        filtered_labels: set[Any] = set()
+        if self._focused_communities:
+            filtered_labels.update(self._focused_communities.keys())
+        if self._secondary_communities:
+            filtered_labels.update(self._secondary_communities.keys())
+        if self._background_communities:
+            filtered_labels.update(self._background_communities.keys())
+
+        nodes_mapping = self._nodes_mapping or {}
+        nodes_to_display_set = set(self.nodes_to_display) if self.nodes_to_display else set()
+
+        communities_nodes_segments: CommunityNodesSegments = {}
+
+        # Use TimeModules API directly for efficient segment extraction
+        time_modules_dict = self._original_time_modules.get_time_modules_dict()
+
+        for module_label, nodes_segments_raw in time_modules_dict.items():
+            if module_label not in filtered_labels:
+                continue
+
+            nodes_segments: dict[int, list[list[int]]] = {}
+            for node, time_segments in nodes_segments_raw.items():
+                # Remap node to display index
+                mapped_node = nodes_mapping.get(node, -1)
+                if mapped_node == -1:
+                    continue
+                if nodes_to_display_set and mapped_node not in nodes_to_display_set:
+                    continue
+
+                # Convert TimeSegment objects to [start, end] lists
+                nodes_segments[mapped_node] = [[seg.start, seg.end] for seg in time_segments]
+
+            if nodes_segments:
+                communities_nodes_segments[module_label] = nodes_segments
+
+        return communities_nodes_segments
+
+    def _draw_community_periods(self) -> None:
+        """Draw community periods as colored rectangles."""
+        if self._communities_nodes_segments is None:
+            self._communities_nodes_segments = self._create_communities_nodes_segments()
+
+        if self._ax is not None and self._color_mapping is not None:
+            draw_community_periods(
+                self._ax,
+                self._communities_nodes_segments,
+                self._color_mapping,
+                self.height_community_color,
+                self.margin_commu_segment,
+            )
+
+    def _draw_nodes(self) -> None:
+        """Draw nodes as horizontal lines."""
+        if self._show_nodes and self._ax is not None:
+            if self._start_nodes is not None and self._end_nodes is not None:
+                # Use the actual mapped node indices, not sequential 0..N-1
+                # nodes_to_display contains the remapped node indices
+                nodes_set = set(self.nodes_to_display) if self.nodes_to_display else set()
+                draw_nodes(
+                    self._ax,
+                    nodes_set,
+                    self._start_nodes,
+                    self._end_nodes,
+                    self.node_alpha,
+                    self.node_focus,
+                    self.highlight_node_focus,
+                    self.node_linewidth,
+                    self.node_linewidth_focus,
+                    self.longitudinal_nodes_margin,
+                )
+
+    def _draw_edges(self) -> None:
+        """Draw edges between nodes."""
+        if self._show_edges and self._ax is not None and self._time_links is not None:
+            if self._time_node_community_mapping is not None and self._color_mapping is not None:
+                if self.linkstream.delayed:
+                    draw_edges_delayed(
+                        self._ax,
+                        self._time_links,
+                        self._time_node_community_mapping,
+                        self._color_mapping,
+                        self.edge_alpha,
+                        self.color_edges,
+                        self.edge_flatten_factor,
+                        self.show_edge_orientation,
+                        self.linkstream.directed,
+                        self.edge_curve_intensity,
+                    )
+                else:
+                    draw_edges(
+                        self._ax,
+                        self._time_links,
+                        self._time_node_community_mapping,
+                        self._color_mapping,
+                        self.edge_alpha,
+                        self.color_edges,
+                        self.edge_flatten_factor,
+                        self.show_edge_orientation,
+                        self.linkstream.directed,
+                        self.linkstream.continuous,
+                        self.linkstream,
+                        self.edge_width_scale,
+                    )
+
+    def _draw_edge_activity(self) -> None:
+        """Draw edge activity markers as rectangles."""
+        if self._show_edge_activity and self._ax is not None and self._time_links is not None:
+            if self._time_node_community_mapping is not None and self._color_mapping is not None:
+                if self.linkstream.delayed:
+                    draw_edge_activity_delayed(
+                        self._ax,
+                        self._time_links,
+                        self._time_node_community_mapping,
+                        self._color_mapping,
+                        self.edge_activity_alpha,
+                        self.color_edges,
+                        self.edge_flatten_factor,
+                        self.show_edge_orientation,
+                        self.linkstream.directed,
+                        self.edge_activity_width,
+                        self.edge_activity_height,
+                    )
+                else:
+                    draw_edge_activity(
+                        self._ax,
+                        self._time_links,
+                        self._time_node_community_mapping,
+                        self._color_mapping,
+                        self.edge_activity_alpha,
+                        self.color_edges,
+                        self.edge_flatten_factor,
+                        self.show_edge_orientation,
+                        self.linkstream.directed,
+                        self.linkstream.continuous,
+                        self.edge_activity_width,
+                        self.edge_activity_height,
+                    )
+
+    def _draw_focus_highlights(self) -> None:
+        """Draw focus highlights for selected nodes/times."""
+        if self._ax is not None:
+            num_nodes = len(self.nodes_to_display) if self.nodes_to_display else 0
+            draw_focus_highlights(
+                self._ax,
+                self.node_focus,
+                self.time_focus,
+                self.node_OR_time_focus,
+                self.linkstream.network_duration,
+                num_nodes,
+            )
+
+    def _draw_night_highlights(self) -> None:
+        """Draw night highlights."""
+        if self.nights and self._ax is not None and self._end_nodes is not None:
+            draw_night_highlights(self._ax, self.nights, self._end_nodes)
+
+    def _configure_axes(self) -> None:
+        """Configure axes labels and ticks."""
+        if self._ax is not None:
+            num_nodes = len(self.nodes_to_display) if self.nodes_to_display else 0
+            configure_axes(
+                self._ax,
+                self.linkstream.network_duration,
+                self.display_xticks_labels,
+                self.display_yticks_labels,
+                self.label_font_size,
+                self.display_xlabel,
+                self.display_ylabel,
+                self.node_labels,
+                self.node_label_fontsize,
+                self.node_labels_padding,
+                self.bold_labels,
+                num_nodes,
+                self.y_padding_bottom,
+                self.y_padding_top,
+            )
+
+    def _finalize_plot(self, title: str, show_plot: bool) -> None:
+        """
+        Finalize plot configuration.
+
+        Args:
+            title: Plot title.
+            show_plot: Whether to display the plot.
+        """
+        if self._ax is not None:
+            finalize_plot(self._ax, title, show_plot)

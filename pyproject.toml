@@ -1,6 +1,6 @@
 [project]
 name = "dcd-lago"
-version = "1.0.3"
+version = "1.0.4"
 description = "Python implementation of the LAGO method for dynamic community detection on temporal networks"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,6 +9,28 @@ authors = [
     { name="Victor Brabant", email="victorbrabant@gmail.com" }
 ]
 keywords = ["lago", "networks", "temporal networks", "modularity", "structures"]
+
+# Core dependencies - minimal for algorithm-only use
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+# Visualization extras - for plotting modules
+viz = [
+    "matplotlib>=3.5",
+    "scikit-learn>=1.0",
+]
+# All extras
+all = [
+    "dcd-lago[viz]",
+]
+# Development dependencies
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+]
+
 [project.urls]
 Homepage = "https://github.com/fondationsahar/dynamic_community_detection"
 Issues = "https://github.com/fondationsahar/dynamic_community_detection/issues"

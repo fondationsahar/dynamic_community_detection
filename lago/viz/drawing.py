@@ -1,0 +1,504 @@
+"""
+Drawing operations module for longitudinal community plotting.
+
+This module provides functions for rendering various visual elements in the longitudinal
+community visualization. It handles drawing of community periods, nodes, edges, highlights,
+and other graphical components.
+
+Key Functions:
+    - draw_community_periods: Draw colored rectangles for community time periods
+    - draw_nodes: Draw horizontal lines representing nodes
+    - draw_focus_highlights: Draw highlight rectangles for focused nodes/times
+    - draw_edges: Draw arcs between nodes for regular linkstreams
+    - draw_edges_delayed: Draw arcs between nodes for delayed linkstreams
+    - draw_edge_activity: Draw cross markers for edge activity
+    - draw_night_highlights: Draw vertical lines for night periods
+"""
+
+from typing import Any, Dict, List, Optional, Set
+
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Rectangle
+
+from .drawing_utils import _draw_edge_common
+from .geometry import (
+    create_highlight_rectangle,
+    draw_arrow_head,
+)
+
+
+def draw_community_periods(
+    ax: plt.Axes,
+    communities_nodes_segments: Dict[Any, Dict[Any, List[List[int]]]],
+    color_mapping: Dict[Any, Any],
+    height_community_color: float,
+    margin_commu_segment: float,
+):
+    """
+    Draw community periods as colored rectangles using pre-computed time segments.
+
+    This optimized function draws rectangles for entire time segments rather than
+    individual time points, significantly improving rendering performance for
+    communities with consecutive time periods.
+
+    Args:
+        ax: Matplotlib axes to draw on
+        communities_nodes_segments: Dictionary mapping community labels to node time segments
+            Structure: {community_label: {node: [[start1, end1], [start2, end2], ...]}}
+        color_mapping: Dictionary mapping community labels to colors
+        height_community_color: Height of community rectangles in plot coordinates
+
+    Note:
+        This function assumes time segments are pre-computed and represent
+        continuous time ranges for each node within each community.
+    """
+    periods = []
+    # margin_commu_segment = 0.35
+    for community_label, nodes_segment in communities_nodes_segments.items():
+        for node, segments in nodes_segment.items():
+            for segment in segments:
+                rect = Rectangle(
+                    (
+                        segment[0] + margin_commu_segment,
+                        node + (0.5 - height_community_color / 2),
+                    ),
+                    width=segment[1] - segment[0] + 1 - 2 * margin_commu_segment,
+                    height=height_community_color,
+                    facecolor=color_mapping.get(community_label, "gainsboro"),
+                    edgecolor=color_mapping.get(community_label, "gainsboro"),
+                )
+
+                periods.append(rect)
+
+    pc = PatchCollection(periods, match_original=True)
+    ax.add_collection(pc)
+
+
+def draw_nodes(
+    ax: Axes,
+    nodes: Set,
+    start_nodes: Dict,
+    end_nodes: Dict,
+    node_alpha: float,
+    node_focus: list = [],
+    highlight_node_focus: bool = True,
+    linewidth: float = 0.25,
+    linewidth_focus: float = 0.5,
+    longitudinal_margin: float = 0,
+):
+    """
+    Draw nodes as horizontal lines.
+
+    Args:
+        ax: Matplotlib axes
+        nodes: Set of nodes
+        start_nodes: Start times for nodes
+        end_nodes: End times for nodes
+        node_alpha: Transparency for node lines
+        node_focus: List of focused node indices
+        highlight_node_focus: Whether to highlight focused nodes
+        linewidth: Line width for regular (non-focused) nodes. Default 0.25.
+        linewidth_focus: Line width for focused nodes. Default 0.5.
+    """
+    # longitudinal_margin = 0.3
+    for node in nodes:
+        if highlight_node_focus and node in node_focus:
+            ax.hlines(
+                y=node + 0.5,
+                xmin=start_nodes[node] + longitudinal_margin,
+                xmax=end_nodes[node] - longitudinal_margin,
+                color="black",
+                linestyle="-",
+                linewidth=linewidth_focus,
+                alpha=1,
+            )
+            continue
+        ax.hlines(
+            y=node + 0.5,
+            xmin=start_nodes[node] + longitudinal_margin,
+            xmax=end_nodes[node] - longitudinal_margin,
+            color="black",
+            linestyle="-",
+            linewidth=linewidth,
+            alpha=node_alpha,
+        )
+
+
+def draw_focus_highlights(
+    ax: Axes,
+    node_focus: Optional[list],
+    time_focus: Optional[int],
+    node_OR_time_focus: bool,
+    network_duration: int,
+    num_nodes: int,
+):
+    """
+    Draw highlight rectangles for focused nodes and times.
+
+    Args:
+        ax: Matplotlib axes
+        node_focus: Node to highlight
+        time_focus: Time to highlight
+        node_OR_time_focus: Whether to use OR logic for focus
+        network_duration: Total network duration
+        num_nodes: Number of nodes
+    """
+    # Ensure node_focus is a list (default to empty list if None)
+    node_focus_list = node_focus if node_focus is not None else []
+
+    if (node_OR_time_focus and len(node_focus_list) > 0) or (time_focus is not None):
+        # Highlight node focus area
+        for nfocus in node_focus_list:
+            rec = create_highlight_rectangle(
+                node=nfocus,
+                time=0,
+                x_decay=0,
+                y_delay=0.33,
+                width=network_duration + 1,
+                height=0.33,
+                alpha=1,
+            )
+            ax.add_patch(rec)
+        rec = create_highlight_rectangle(
+            node=0.0,
+            time=0,
+            x_decay=0,
+            y_delay=0.33,
+            width=network_duration + 1,
+            height=0.33,
+            alpha=1,
+        )
+        ax.add_patch(rec)
+
+    if time_focus is not None:
+        if node_OR_time_focus or len(node_focus_list) == 0:
+            # Highlight entire time column
+            rec = create_highlight_rectangle(
+                node=-0.25, time=time_focus, height=num_nodes + 0.5
+            )
+            ax.add_patch(rec)
+        else:
+            # Highlight specific node-time intersection
+            for nfocus in node_focus_list:
+                rec = create_highlight_rectangle(
+                    node=float(nfocus), time=time_focus, x_decay=0.1, width=0.8
+                )
+                ax.add_patch(rec)
+
+
+def draw_edge_activity(
+    ax: Axes,
+    time_links: List,
+    time_node_community_mapping: Dict,
+    color_mapping: Dict,
+    edge_alpha: float,
+    color_edges: bool,
+    edge_flatten_factor: float,
+    show_edge_orientation: bool = False,
+    is_directed: bool = False,
+    is_continuous: bool = False,
+    marker_width: float = 0.8,
+    marker_height: float = 0.4,
+):
+    """
+    Draw rectangle markers for edge activity (non-delayed linkstreams).
+
+    Args:
+        ax: Matplotlib axes
+        time_links: List of (source, target, time, weight) tuples
+        time_node_community_mapping: Mapping from (node, time) to community
+        color_mapping: Color mapping for communities
+        edge_alpha: Transparency for markers
+        color_edges: Whether to color edges by community
+        edge_flatten_factor: Flattening factor for edge arcs
+        show_edge_orientation: Whether to display arrow heads showing edge orientation
+        is_directed: Whether the linkstream is directed
+        is_continuous: Whether the linkstream has continuous time intervals
+        marker_width: Width of edge activity rectangle markers (0.0 to 1.0). Default 0.8.
+        marker_height: Height of edge activity rectangle markers (0.0 to 1.0). Default 0.4.
+    """
+    rectangles = []
+
+    for source, target, time, weight in time_links:
+        for node in [source, target]:
+            if node == -1:
+                continue
+            # Calculate rectangle position (centered on node+0.5, time+0.5)
+            x = time + 0.5 - marker_width / 2
+            y = node + 0.5 - marker_height / 2
+            rect = Rectangle(
+                (x, y),
+                width=marker_width,
+                height=marker_height,
+                facecolor="black",
+                edgecolor="none",
+                alpha=edge_alpha,
+            )
+            rectangles.append(rect)
+
+    if rectangles:
+        pc = PatchCollection(rectangles, match_original=True)
+        ax.add_collection(pc)
+
+
+def draw_edge_activity_delayed(
+    ax: Axes,
+    time_links: List,
+    time_node_community_mapping: Dict,
+    color_mapping: Dict,
+    edge_alpha: float,
+    color_edges: bool,
+    edge_flatten_factor: float,
+    show_edge_orientation: bool = False,
+    is_directed: bool = False,
+    marker_width: float = 0.8,
+    marker_height: float = 0.4,
+):
+    """
+    Draw rectangle markers for edge activity (delayed linkstreams).
+
+    For delayed linkstreams, each edge has a source time and target time.
+    This draws rectangle markers at:
+    - Source node at source_time
+    - Target node at target_time
+
+    Args:
+        ax: Matplotlib axes
+        time_links: List of (source, target, source_time, target_time, weight) tuples
+        time_node_community_mapping: Mapping from (node, time) to community
+        color_mapping: Color mapping for communities
+        edge_alpha: Transparency for markers
+        color_edges: Whether to color edges by community
+        edge_flatten_factor: Flattening factor for edge arcs
+        show_edge_orientation: Whether to display arrow heads showing edge orientation
+        is_directed: Whether the linkstream is directed
+        marker_width: Width of edge activity rectangle markers (0.0 to 1.0). Default 0.8.
+        marker_height: Height of edge activity rectangle markers (0.0 to 1.0). Default 0.4.
+    """
+    # For undirected graphs, filter duplicate edges like in draw_edges_delayed
+    seen_edges: Set = set()
+    rectangles = []
+
+    for source, target, source_time, target_time, weight in time_links:
+        # Skip if we already processed the reverse edge (for undirected graphs)
+        if not is_directed:
+            edge_key = tuple(sorted([(source, source_time), (target, target_time)]))
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+
+        # Draw rectangle at source node position (at source_time)
+        if source != -1:
+            x = source_time + 0.5 - marker_width / 2
+            y = source + 0.5 - marker_height / 2
+            rect = Rectangle(
+                (x, y),
+                width=marker_width,
+                height=marker_height,
+                facecolor="black",
+                edgecolor="none",
+                alpha=edge_alpha,
+            )
+            rectangles.append(rect)
+
+        # Draw rectangle at target node position (at target_time)
+        if target != -1:
+            x = target_time + 0.5 - marker_width / 2
+            y = target + 0.5 - marker_height / 2
+            rect = Rectangle(
+                (x, y),
+                width=marker_width,
+                height=marker_height,
+                facecolor="black",
+                edgecolor="none",
+                alpha=edge_alpha,
+            )
+            rectangles.append(rect)
+
+    if rectangles:
+        pc = PatchCollection(rectangles, match_original=True)
+        ax.add_collection(pc)
+
+
+def draw_edges(
+    ax: Axes,
+    time_links: List,
+    time_node_community_mapping: Dict,
+    color_mapping: Dict,
+    edge_alpha: float,
+    color_edges: bool,
+    edge_flatten_factor: float,
+    show_edge_orientation: bool = False,
+    is_directed: bool = False,
+    is_continuous: bool = False,
+    linkstream=None,
+    width_scale: float = 0.3,
+):
+    """
+    Draw edges between nodes.
+
+    Args:
+        ax: Matplotlib axes
+        time_links: List of edge tuples. Format depends on linkstream type:
+            - Regular: (source, target, time, weight)
+            - Continuous: (source, target, start_time, end_time, weight)
+        time_node_community_mapping: Mapping from (node, time) to community
+        color_mapping: Color mapping for communities
+        edge_alpha: Transparency for edges
+        color_edges: Whether to color edges by community
+        edge_flatten_factor: Flattening factor for edge arcs
+        show_edge_orientation: Whether to display arrow heads showing edge orientation
+        is_directed: Whether the linkstream is directed
+        is_continuous: Whether the linkstream has continuous time intervals
+        linkstream: The linkstream object for accessing original edge directions
+        width_scale: Scale for edge width (0.0 to 1.0). Controls how much of the
+            time unit width an edge fills. At 0, edges are invisible. At 1, consecutive
+            edges at t and t+1 touch with no gap between them. Default is 0.3.
+    """
+    # Calculate the linewidth that corresponds to exactly 1 data unit
+    # This ensures width_scale=1.0 fills the time unit with no gap and no overlap
+    # We use the axes transform to convert from data coords to display coords (once, outside loop)
+    p0 = ax.transData.transform((0, 0))
+    p1 = ax.transData.transform((1, 0))
+    one_time_unit_in_points = abs(p1[0] - p0[0])
+
+    # Cap linewidth to prevent extremely thick edges that slow down saving
+    # Maximum of 20 points (still quite visible)
+    max_linewidth = min(one_time_unit_in_points, 20.0)
+
+    for link in time_links:
+        if is_continuous:
+            # Continuous linkstreams have: (source, target, start_time, end_time, weight)
+            source, target, start_time, end_time, weight = link
+            weight = 1.0  # Normalize weight for continuous
+            time = (start_time + end_time) // 2  # Use midpoint for drawing
+        else:
+            # Regular linkstreams have: (source, target, time, weight)
+            source, target, time, weight = link
+
+        # Apply width_scale to linewidth using capped calculation
+        # At width_scale=1.0, linewidth equals the capped max_linewidth
+        linewidth = 0.5  # weight * width_scale * max_linewidth
+
+        node1, node2 = source, target
+        if not is_directed:
+            node1, node2 = sorted([node1, node2])
+        center1 = (time + 0.5, node1 + 0.5)
+        center2 = (time + 0.5, node2 + 0.5)
+
+        # Use common edge drawing logic
+        _draw_edge_common(
+            ax=ax,
+            center1=center1,
+            center2=center2,
+            time_node_community_mapping=time_node_community_mapping,
+            color_mapping=color_mapping,
+            edge_alpha=edge_alpha,
+            color_edges=color_edges,
+            source_node=source,
+            target_node=target,
+            source_time=time,
+            target_time=time,
+            edge_flatten_factor=edge_flatten_factor,
+            linewidth=linewidth,
+            straight=False,
+        )
+
+        # Draw arrow head for edge orientation if requested and linkstream is directed
+        if show_edge_orientation and is_directed:
+            draw_arrow_head(ax, center1, center2, "black", edge_alpha, linewidth)
+
+
+def draw_edges_delayed(
+    ax: Axes,
+    time_links: List,
+    time_node_community_mapping: Dict,
+    color_mapping: Dict,
+    edge_alpha: float,
+    color_edges: bool,
+    edge_flatten_factor: float,
+    show_edge_orientation: bool = False,
+    is_directed: bool = False,
+    curve_intensity: float = 0.0,
+):
+    """
+    Draw edges between nodes for delayed linkstreams.
+
+    Args:
+        ax: Matplotlib axes
+        time_links: List of (source, target, source_time, target_time, weight) tuples
+        time_node_community_mapping: Mapping from (node, time) to community
+        color_mapping: Color mapping for communities
+        edge_alpha: Transparency for edges
+        color_edges: Whether to color edges by community
+        edge_flatten_factor: Flattening factor for edge arcs
+        show_edge_orientation: Whether to display arrow heads showing edge orientation
+        is_directed: Whether the linkstream is directed
+        curve_intensity: Controls curve intensity for delayed edges (0.0 = straight,
+            positive = curve right, negative = curve left). Default 0.0.
+    """
+    # For undirected graphs, lago LinkStream returns both A→B and B→A
+    # We need to filter to only draw each unique edge once
+    seen_edges: Set = set()
+
+    for source, target, source_time, target_time, weight in time_links:
+        # Skip if we already drew the reverse edge (for undirected graphs)
+        if not is_directed:
+            # Create a canonical key that's the same for both directions
+            # Use sorted node pair + sorted time pair
+            edge_key = tuple(sorted([(source, source_time), (target, target_time)]))
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+
+        center1 = (source_time + 0.5, source + 0.5)
+        center2 = (target_time + 0.5, target + 0.5)
+
+        # For consistent curve direction, always draw from lower y (node) to higher y
+        # This ensures all curves bend the same way relative to the node axis
+        if not is_directed and center1[1] > center2[1]:
+            center1, center2 = center2, center1
+
+        # Use common edge drawing logic
+        _draw_edge_common(
+            ax=ax,
+            center1=center1,
+            center2=center2,
+            time_node_community_mapping=time_node_community_mapping,
+            color_mapping=color_mapping,
+            edge_alpha=edge_alpha,
+            color_edges=color_edges,
+            source_node=source,
+            target_node=target,
+            source_time=source_time,
+            target_time=target_time,
+            edge_flatten_factor=edge_flatten_factor,
+            linewidth=weight,
+            straight=True,
+            curve_intensity=curve_intensity,
+        )
+
+        # Draw arrow head for edge orientation if requested and linkstream is directed
+        if show_edge_orientation and is_directed:
+            draw_arrow_head(ax, center1, center2, "black", edge_alpha, weight)
+
+
+def draw_night_highlights(ax: Axes, nights: List, end_nodes: Dict):
+    """
+    Draw vertical lines to highlight night periods.
+
+    Args:
+        ax: Matplotlib axes
+        nights: List of time points for night highlights
+        end_nodes: End times for nodes
+    """
+    for night in nights:
+        ax.vlines(
+            x=night + 0.5,
+            ymin=0,
+            ymax=len(end_nodes),
+            color="black",
+            linewidth=2,
+        )

@@ -4,8 +4,14 @@
 
 ### Getting started using pip
 
-```
+**Core (algorithm only, minimal dependencies):**
+```bash
 pip install dcd-lago
+```
+
+**With visualization support:**
+```bash
+pip install dcd-lago[viz]
 ```
 
 
@@ -31,7 +37,7 @@ We call this task **Dynamic Community Detection**.
 
 
 ```python
-from lago import LinkStream, lago_communities
+from lago import LinkStream, lago_modules, LexType
 ```
 
 ```python
@@ -71,30 +77,36 @@ my_linkstream.add_links(time_links)
 # NOTE time links can also be imported from txt files with the read_txt() method
 
 ## Display linkstream informations
-print(f"The link stream consists of {my_linkstream.nb_edges} temporal edges (or time links) accross {my_linkstream.nb_nodes} nodes and {my_linkstream.network_duration} time steps, of which only {my_linkstream.nb_timesteps} contain activity.")
+print(f"The link stream consists of {my_linkstream.nb_edges} temporal edges (or time links) "
+      f"across {my_linkstream.nb_nodes} nodes and {my_linkstream.network_duration} time steps, "
+      f"of which only {my_linkstream.nb_timesteps} contain activity.")
 ```
 
 ```python
-## Compute dynamic communities
-dynamic_communities = lago_communities(
+## Detect temporal modules
+time_modules = lago_modules(
     my_linkstream,
-    nb_iter=3, # run LAGO 3 times and return best result
-    )
+    lex_type=LexType.MM,  # Mean-Membership expectation
+    nb_iter=3,            # Run LAGO 3 times and return best result
+)
 
-# Each dynamic community is represented by a list of (<node>, <time instant>)
+# Each module contains (node, time) tuples
+print(f"{time_modules.nb_modules} temporal modules have been found")
 
-print(f"{len(dynamic_communities)} dynamic communities have been found")
+# Iterate over modules
+for module in time_modules.iter_modules():
+    print(f"Module {module.label}: {module.size} nodes, {module.duration} timesteps")
 ```
 
-#### Plot Dynamic Communities
+#### Plot Temporal Modules (requires dcd-lago[viz])
 ```python
-from lago import plot_dynamic_communities
+from lago import LongitudinalModulesPlot
 
-fig = plot_dynamic_communities(
-        linkstream=my_linkstream,
-        communities=dynamic_communities,
-    )
-fig.show()
+plot = LongitudinalModulesPlot(my_linkstream, width=1200, height=800)
+plot.configure_nodes(auto_ordering=True)
+plot.configure_modules(time_modules)
+plot.draw()
+plot.save("modules.png")
 ```
 
 #### Compute Longitudinal Modularity Score
@@ -103,12 +115,13 @@ from lago import longitudinal_modularity
 
 ## Compute Longitudinal Modularity score
 ## (the higher the better / maximum is 1)
-long_mod_score = longitudinal_modularity(
+result = longitudinal_modularity(
     my_linkstream, 
-    dynamic_communities,
-    )
+    time_modules,
+    lex_type=LexType.MM,
+)
 
-print(f"Dynamic communities detected on the linkstream have a Longitudinal Modularity score of {long_mod_score} ")
+print(f"Longitudinal Modularity score: {result.value}")
 ```
 
 ## Advanced Parameters

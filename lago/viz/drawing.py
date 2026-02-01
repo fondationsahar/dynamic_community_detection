@@ -267,7 +267,8 @@ def draw_edge_activity_delayed(
 
     Args:
         ax: Matplotlib axes
-        time_links: List of (source, target, source_time, target_time, weight) tuples
+        time_links: List of (source, target, source_time, target_time[, weight]) tuples.
+            Weight is optional and defaults to 1.0 if not provided.
         time_node_community_mapping: Mapping from (node, time) to community
         color_mapping: Color mapping for communities
         edge_alpha: Transparency for markers
@@ -282,7 +283,9 @@ def draw_edge_activity_delayed(
     seen_edges: set = set()
     rectangles = []
 
-    for source, target, source_time, target_time, weight in time_links:
+    for link in time_links:
+        # Handle both 4-element (no weight) and 5-element (with weight) tuples
+        source, target, source_time, target_time = link[0], link[1], link[2], link[3]
         # Skip if we already processed the reverse edge (for undirected graphs)
         if not is_directed:
             edge_key = tuple(sorted([(source, source_time), (target, target_time)]))
@@ -420,7 +423,8 @@ def draw_edges_delayed(
 
     Args:
         ax: Matplotlib axes
-        time_links: List of (source, target, source_time, target_time, weight) tuples
+        time_links: List of (source, target, source_time, target_time[, weight]) tuples.
+            Weight is optional and defaults to 1.0 if not provided.
         time_node_community_mapping: Mapping from (node, time) to community
         color_mapping: Color mapping for communities
         edge_alpha: Transparency for edges
@@ -435,7 +439,10 @@ def draw_edges_delayed(
     # We need to filter to only draw each unique edge once
     seen_edges: set = set()
 
-    for source, target, source_time, target_time, weight in time_links:
+    for link in time_links:
+        # Handle both 4-element (no weight) and 5-element (with weight) tuples
+        source, target, source_time, target_time = link[0], link[1], link[2], link[3]
+        weight = link[4] if len(link) > 4 else 1.0
         # Skip if we already drew the reverse edge (for undirected graphs)
         if not is_directed:
             # Create a canonical key that's the same for both directions

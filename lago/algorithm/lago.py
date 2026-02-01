@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import copy
 import sys
-from typing import TYPE_CHECKING
 
 import lago.core.utils as tls
 from lago.algorithm._internal._lago_module import _LagoModule
 from lago.algorithm._internal.runner import lago_run
 from lago.core.enums import LexType
+from lago.core.linkstream import LinkStream
 from lago.core.time_modules import TimeModules
-
-if TYPE_CHECKING:
-    from lago.core.linkstream import LinkStream
 
 
 def lago_modules(
@@ -98,8 +95,24 @@ def lago_modules(
         raise ValueError(msg)
 
     # Pre-process continuous linkstreams
+    # Create a fresh copy to avoid modifying the user's original linkstream
+    # Note: copy.deepcopy doesn't work due to circular references in Leaf objects
     if linkstream.continuous:
-        linkstream._split_continuous_linkstream()
+        # Get raw links before splitting
+        raw_links = linkstream.get_time_links(include_weights=True)
+
+        # Create new linkstream with same configuration
+        linkstream_copy = LinkStream(
+            continuous=True,
+            directed=linkstream.directed,
+            delayed=False,
+            partite_mapping=linkstream.partite_mapping.copy()
+            if linkstream.partite_mapping
+            else None,
+        )
+        linkstream_copy.add_links(list(raw_links))
+        linkstream_copy._split_continuous_linkstream()
+        linkstream = linkstream_copy
 
     # Run LAGO algorithm (potentially multiple iterations)
     best_modularity = -sys.maxsize

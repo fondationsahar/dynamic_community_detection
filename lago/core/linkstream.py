@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import logging
 import sys
 import warnings
@@ -515,10 +514,12 @@ class LinkStream:
         This method restructures the leaves_dict to have separate entries
         for each time segment where continuous links exist.
         """
-        old_leaves_dict = copy.deepcopy(self.leaves_dict)
+        # Store references to old leaves (no deep copy needed - we just iterate)
+        # We can't use deepcopy due to circular references between Leaf objects
+        old_leaves_items = list(self.leaves_dict.items())
         self.leaves_dict = {}
 
-        for (node, time), leaf in old_leaves_dict.items():
+        for (node, time), leaf in old_leaves_items:
             # Split edges based on time_instants
             for time_edge in leaf.topo_neighbors:
                 # NOTE: This may be a bottleneck for large networks
@@ -563,6 +564,9 @@ class LinkStream:
                             duration=duration,
                         )
                     )
+
+        # Recompute time neighbors for the new leaves_dict
+        self._compute_time_neighbors()
 
     def _compute_time_neighbors(self) -> None:
         """Compute temporal neighbors for each leaf.

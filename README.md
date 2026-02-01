@@ -13,7 +13,7 @@ LAGO detects communities (modules) that evolve over time in fine-grained tempora
 <p align="center">
 <img src="img/lmodules_ex.png" alt="Temporal communities example" width="600"/>
 <br>
-<em>A link stream with 5 nodes showing two temporal communities (blue and green) that evolve over time.</em>
+<em>A link stream with 5 nodes showing two dynamic communities (blue and green) that evolve over time.</em>
 </p>
 
 ## Installation

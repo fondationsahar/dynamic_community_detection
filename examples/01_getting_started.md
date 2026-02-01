@@ -13,11 +13,14 @@ This guide introduces the basic concepts of temporal networks and how to use LAG
 
 ## Part 1: Understanding Link Streams
 
-A **Link Stream** represents interactions between entities over time. Each interaction has:
-- A **source** node (who initiates)
-- A **target** node (who receives)
-- A **time** when it happens
-- Optionally, a **weight** (importance/strength)
+A **Link Stream** represents interactions between entities over time. Each interaction (edge) connects:
+- A **first node**
+- A **second node**
+- At a specific **time**
+- Optionally, with a **weight** (importance/strength)
+
+> **Note**: By default, edges are **undirected** (symmetric). For directed networks where
+> "source → target" matters, use `LinkStream(directed=True)`.
 
 ### Real-World Examples
 
@@ -32,6 +35,14 @@ A **Link Stream** represents interactions between entities over time. Each inter
 
 ## Part 2: Creating Your First LinkStream
 
+> **⚠️ Important: Time Normalization**
+> 
+> LAGO expects timestamps to be normalized integers where the minimum time step is 1.
+> If your timestamps have gaps (e.g., `0, 2, 6, 8`), divide by their GCD (e.g., `0, 1, 3, 4`).
+> 
+> This improves performance and ensures correct interpretation of the `omega` parameter.
+> See `02_linkstream_types.py` for a complete example.
+
 ### From Code
 
 ```python
@@ -40,7 +51,7 @@ from lago import LinkStream
 # Create an empty link stream
 ls = LinkStream()
 
-# Add interactions as (source, target, time) tuples
+# Add interactions as (node_a, node_b, time) tuples
 ls.add_links([
     (0, 1, 0),  # Node 0 interacts with Node 1 at time 0
     (1, 2, 0),  # Node 1 interacts with Node 2 at time 0
@@ -61,7 +72,7 @@ If you have a text file with interactions:
 
 ```
 # interactions.txt
-# source target time
+# node_a node_b time
 0 1 0
 1 2 0
 0 1 1
@@ -77,7 +88,7 @@ from lago import LinkStream
 ls = LinkStream()
 ls.read_txt(
     path="interactions.txt",
-    columns_order=["source", "target", "time"]
+    columns_order=["source", "target", "time"]  # API uses source/target names
 )
 ```
 
@@ -200,6 +211,7 @@ communities = lago_modules(ls, alpha=0.5)
 
 ## Next Steps
 
-- `02_linkstream_types.py` - Learn about directed, continuous, and delayed networks
-- `03_community_detection.py` - Advanced community detection options
-- `05_visualization.py` - Visualize your results
+- [02_linkstream_types.py](02_linkstream_types.py) - Learn about directed, continuous, and delayed networks
+- [03_community_detection.py](03_community_detection.py) - Advanced community detection options
+- [04_modularity.py](04_modularity.py) - Understand and compute longitudinal modularity
+- [05_visualization.py](05_visualization.py) - Visualize your results

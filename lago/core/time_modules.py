@@ -375,29 +375,32 @@ class TimeModules:
 
     @staticmethod
     def _load_json(path: Path) -> dict[int, set[tuple[int, int]]]:
-        """Load from JSON file, auto-detecting standard vs segment format."""
+        """Load from JSON file, auto-detecting standard vs segment format.
+
+        Ensures all values (module labels, nodes, times) are converted to int.
+        """
         with path.open() as f:
             data = json.load(f)
 
         raw_modules: dict[int, set[tuple[int, int]]] = {}
 
         for module_str, content in data.items():
-            module = int(module_str)
+            module = int(module_str)  # Ensure module label is int
             raw_modules[module] = set()
 
             # Detect format: segment format has {"nodes": {...}}
             if isinstance(content, dict) and "nodes" in content:
                 # Segment format: {"nodes": {"0": [[0, 2], [5, 7]], "1": [[0, 0]]}}
                 for node_str, segments in content["nodes"].items():
-                    node = int(node_str)
+                    node = int(node_str)  # Ensure node is int
                     for segment in segments:
-                        start, end = segment[0], segment[1]
+                        start, end = int(segment[0]), int(segment[1])  # Ensure times are int
                         for time in range(start, end + 1):
                             raw_modules[module].add((node, time))
             else:
                 # Standard format: [[node, time], ...]
                 for node, time in content:
-                    raw_modules[module].add((int(node), int(time)))
+                    raw_modules[module].add((int(node), int(time)))  # Ensure node/time are int
 
         return raw_modules
 
@@ -887,6 +890,7 @@ class TimeModules:
         """Load time modules from a JSON file.
 
         Automatically detects format (standard or segment-based).
+        Ensures all values (module labels, nodes, times) are converted to int.
 
         Args:
             path: Path to the input file.
@@ -906,22 +910,22 @@ class TimeModules:
         raw_modules: dict[int, set[tuple[int, int]]] = {}
 
         for module_str, content in data.items():
-            module = int(module_str)
+            module = int(module_str)  # Ensure module label is int
             raw_modules[module] = set()
 
             # Detect format: segment format has {"nodes": {...}}
             if isinstance(content, dict) and "nodes" in content:
                 # Segment format: {"nodes": {"0": [[0, 2], [5, 7]], "1": [[0, 0]]}}
                 for node_str, segments in content["nodes"].items():
-                    node = int(node_str)
+                    node = int(node_str)  # Ensure node is int
                     for segment in segments:
-                        start, end = segment[0], segment[1]
+                        start, end = int(segment[0]), int(segment[1])  # Ensure times are int
                         for time in range(start, end + 1):
                             raw_modules[module].add((node, time))
             else:
                 # Standard format: [[node, time], ...]
                 for node, time in content:
-                    raw_modules[module].add((int(node), int(time)))
+                    raw_modules[module].add((int(node), int(time)))  # Ensure node/time are int
 
         return cls(raw_modules)
 

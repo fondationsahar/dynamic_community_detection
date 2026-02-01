@@ -500,9 +500,16 @@ from lago import (
 )
 from lago.viz import LongitudinalModulesPlot
 
-# 1. Create linkstream
+# 1. Create linkstream (times should be normalized - see note below)
 ls = LinkStream()
 ls.add_links([(0, 1, 0), (1, 2, 0), (0, 1, 1)])
+
+# For k-partite networks, use set_partite()
+# ls.set_partite({0: 0, 1: 0, 2: 1, 3: 1})  # bipartite
+
+# IMPORTANT: Normalize timestamps by dividing by their GCD
+# Bad:  times (0, 2, 6, 8) → gaps waste computation
+# Good: times (0, 1, 3, 4) → divide by gcd=2
 
 # 2. Detect communities
 tm = lago_modules(ls, lex="MM", omega=2)

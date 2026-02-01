@@ -595,28 +595,54 @@ class LinkStream:
     # Query Methods
     # =========================================================================
 
-    def get_time_links(self) -> set[tuple[int, ...]]:
+    @property
+    def is_weighted(self) -> bool:
+        """Check if the network has non-trivial weights (any weight != 1).
+
+        Returns:
+            True if any edge has a weight different from 1, False otherwise.
+        """
+        for leaf in self.leaves_dict.values():
+            for neighb in leaf.topo_neighbors:
+                if neighb.weight != 1:
+                    return True
+        return False
+
+    def get_time_links(self, include_weights: bool | None = None) -> set[tuple[int, ...]]:
         """Get all temporal links in the stream.
 
         Automatically returns links in the appropriate format based on the mode:
-        - INSTANTANEOUS: (source, target, time, weight)
-        - CONTINUOUS: (source, target, time, duration, weight)
-        - DELAYED: (source, target, source_time, target_time, weight)
+        - INSTANTANEOUS: (source, target, time[, weight])
+        - CONTINUOUS: (source, target, time, duration[, weight])
+        - DELAYED: (source, target, source_time, target_time[, weight])
+
+        Args:
+            include_weights: Whether to include weights in the output tuples.
+                - None (default): Include weights only if network is weighted (any weight != 1)
+                - True: Always include weights
+                - False: Never include weights
 
         Returns:
             Set of link tuples in the mode-appropriate format.
         """
-        if self.mode == LinkStreamMode.CONTINUOUS:
-            return self._get_continuous_time_links()
-        if self.mode == LinkStreamMode.DELAYED:
-            return self._get_delayed_time_links()
-        return self._get_instantaneous_time_links()
+        # Determine whether to include weights
+        if include_weights is None:
+            include_weights = self.is_weighted
 
-    def _get_instantaneous_time_links(self) -> set[tuple[int, ...]]:
+        if self.mode == LinkStreamMode.CONTINUOUS:
+            return self._get_continuous_time_links(include_weights)
+        if self.mode == LinkStreamMode.DELAYED:
+            return self._get_delayed_time_links(include_weights)
+        return self._get_instantaneous_time_links(include_weights)
+
+    def _get_instantaneous_time_links(self, include_weights: bool = True) -> set[tuple[int, ...]]:
         """Get time links for instantaneous mode.
 
+        Args:
+            include_weights: Whether to include weights in the output.
+
         Returns:
-            Set of (source, target, time, weight) tuples.
+            Set of (source, target, time[, weight]) tuples.
         """
         time_links: set[tuple[int, ...]] = set()
         for leaf in self.leaves_dict.values():
@@ -624,15 +650,20 @@ class LinkStream:
             time = leaf.time
             for neighb in leaf.topo_neighbors:
                 target = neighb.target.node
-                weight = neighb.weight
-                time_links.add((source, target, time, weight))
+                if include_weights:
+                    time_links.add((source, target, time, neighb.weight))
+                else:
+                    time_links.add((source, target, time))
         return time_links
 
-    def _get_continuous_time_links(self) -> set[tuple[int, ...]]:
+    def _get_continuous_time_links(self, include_weights: bool = True) -> set[tuple[int, ...]]:
         """Get time links for continuous mode.
 
+        Args:
+            include_weights: Whether to include weights in the output.
+
         Returns:
-            Set of (source, target, time, duration, weight) tuples.
+            Set of (source, target, time, duration[, weight]) tuples.
         """
         time_links: set[tuple[int, ...]] = set()
         for leaf in self.leaves_dict.values():
@@ -640,16 +671,21 @@ class LinkStream:
             time = leaf.time
             for neighb in leaf.topo_neighbors:
                 target = neighb.target.node
-                weight = neighb.weight
                 duration = neighb.duration
-                time_links.add((source, target, time, duration, weight))
+                if include_weights:
+                    time_links.add((source, target, time, duration, neighb.weight))
+                else:
+                    time_links.add((source, target, time, duration))
         return time_links
 
-    def _get_delayed_time_links(self) -> set[tuple[int, ...]]:
+    def _get_delayed_time_links(self, include_weights: bool = True) -> set[tuple[int, ...]]:
         """Get time links for delayed mode.
 
+        Args:
+            include_weights: Whether to include weights in the output.
+
         Returns:
-            Set of (source, target, source_time, target_time, weight) tuples.
+            Set of (source, target, source_time, target_time[, weight]) tuples.
         """
         time_links: set[tuple[int, ...]] = set()
         for leaf in self.leaves_dict.values():
@@ -657,7 +693,6 @@ class LinkStream:
             source_time = leaf.time
             for neighb in leaf.topo_neighbors:
                 target = neighb.target.node
-                weight = neighb.weight
                 target_time = neighb.target.time
                 # Normalize order by time
                 if source_time < target_time:
@@ -666,7 +701,11 @@ class LinkStream:
                 else:
                     tsource, ttarget = target, source
                     tsource_time, ttarget_time = target_time, source_time
-                link = (tsource, ttarget, tsource_time, ttarget_time, weight)
+
+                if include_weights:
+                    link = (tsource, ttarget, tsource_time, ttarget_time, neighb.weight)
+                else:
+                    link = (tsource, ttarget, tsource_time, ttarget_time)
                 time_links.add(link)
         return time_links
 

@@ -15,7 +15,7 @@ Key Functions:
     - draw_night_highlights: Draw vertical lines for night periods
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -31,8 +31,8 @@ from .geometry import (
 
 def draw_community_periods(
     ax: plt.Axes,
-    communities_nodes_segments: Dict[Any, Dict[Any, List[List[int]]]],
-    color_mapping: Dict[Any, Any],
+    communities_nodes_segments: dict[Any, dict[Any, list[list[int]]]],
+    color_mapping: dict[Any, Any],
     height_community_color: float,
     margin_commu_segment: float,
 ):
@@ -78,9 +78,9 @@ def draw_community_periods(
 
 def draw_nodes(
     ax: Axes,
-    nodes: Set,
-    start_nodes: Dict,
-    end_nodes: Dict,
+    nodes: set,
+    start_nodes: dict,
+    end_nodes: dict,
     node_alpha: float,
     node_focus: list = [],
     highlight_node_focus: bool = True,
@@ -128,8 +128,8 @@ def draw_nodes(
 
 def draw_focus_highlights(
     ax: Axes,
-    node_focus: Optional[list],
-    time_focus: Optional[int],
+    node_focus: list | None,
+    time_focus: int | None,
     node_OR_time_focus: bool,
     network_duration: int,
     num_nodes: int,
@@ -175,9 +175,7 @@ def draw_focus_highlights(
     if time_focus is not None:
         if node_OR_time_focus or len(node_focus_list) == 0:
             # Highlight entire time column
-            rec = create_highlight_rectangle(
-                node=-0.25, time=time_focus, height=num_nodes + 0.5
-            )
+            rec = create_highlight_rectangle(node=-0.25, time=time_focus, height=num_nodes + 0.5)
             ax.add_patch(rec)
         else:
             # Highlight specific node-time intersection
@@ -190,9 +188,9 @@ def draw_focus_highlights(
 
 def draw_edge_activity(
     ax: Axes,
-    time_links: List,
-    time_node_community_mapping: Dict,
-    color_mapping: Dict,
+    time_links: list,
+    time_node_community_mapping: dict,
+    color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
     edge_flatten_factor: float,
@@ -207,7 +205,8 @@ def draw_edge_activity(
 
     Args:
         ax: Matplotlib axes
-        time_links: List of (source, target, time, weight) tuples
+        time_links: List of (source, target, time[, weight]) tuples.
+            Weight is optional and defaults to 1.0 if not provided.
         time_node_community_mapping: Mapping from (node, time) to community
         color_mapping: Color mapping for communities
         edge_alpha: Transparency for markers
@@ -221,7 +220,9 @@ def draw_edge_activity(
     """
     rectangles = []
 
-    for source, target, time, weight in time_links:
+    for link in time_links:
+        # Handle both 3-element (no weight) and 4-element (with weight) tuples
+        source, target, time = link[0], link[1], link[2]
         for node in [source, target]:
             if node == -1:
                 continue
@@ -245,9 +246,9 @@ def draw_edge_activity(
 
 def draw_edge_activity_delayed(
     ax: Axes,
-    time_links: List,
-    time_node_community_mapping: Dict,
-    color_mapping: Dict,
+    time_links: list,
+    time_node_community_mapping: dict,
+    color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
     edge_flatten_factor: float,
@@ -278,7 +279,7 @@ def draw_edge_activity_delayed(
         marker_height: Height of edge activity rectangle markers (0.0 to 1.0). Default 0.4.
     """
     # For undirected graphs, filter duplicate edges like in draw_edges_delayed
-    seen_edges: Set = set()
+    seen_edges: set = set()
     rectangles = []
 
     for source, target, source_time, target_time, weight in time_links:
@@ -324,9 +325,9 @@ def draw_edge_activity_delayed(
 
 def draw_edges(
     ax: Axes,
-    time_links: List,
-    time_node_community_mapping: Dict,
-    color_mapping: Dict,
+    time_links: list,
+    time_node_community_mapping: dict,
+    color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
     edge_flatten_factor: float,
@@ -357,26 +358,17 @@ def draw_edges(
             time unit width an edge fills. At 0, edges are invisible. At 1, consecutive
             edges at t and t+1 touch with no gap between them. Default is 0.3.
     """
-    # Calculate the linewidth that corresponds to exactly 1 data unit
-    # This ensures width_scale=1.0 fills the time unit with no gap and no overlap
-    # We use the axes transform to convert from data coords to display coords (once, outside loop)
-    p0 = ax.transData.transform((0, 0))
-    p1 = ax.transData.transform((1, 0))
-    one_time_unit_in_points = abs(p1[0] - p0[0])
-
-    # Cap linewidth to prevent extremely thick edges that slow down saving
-    # Maximum of 20 points (still quite visible)
-    max_linewidth = min(one_time_unit_in_points, 20.0)
-
     for link in time_links:
         if is_continuous:
-            # Continuous linkstreams have: (source, target, start_time, end_time, weight)
-            source, target, start_time, end_time, weight = link
-            weight = 1.0  # Normalize weight for continuous
+            # Continuous linkstreams have: (source, target, start_time, end_time[, weight])
+            source, target, start_time = link[0], link[1], link[2]
+            end_time = link[3] if len(link) > 3 else start_time + 1
+            # Weight is normalized to 1.0 for continuous linkstreams
             time = (start_time + end_time) // 2  # Use midpoint for drawing
         else:
-            # Regular linkstreams have: (source, target, time, weight)
-            source, target, time, weight = link
+            # Regular linkstreams have: (source, target, time[, weight])
+            source, target, time = link[0], link[1], link[2]
+            # Note: weight available as link[3] if needed for future linewidth scaling
 
         # Apply width_scale to linewidth using capped calculation
         # At width_scale=1.0, linewidth equals the capped max_linewidth
@@ -413,9 +405,9 @@ def draw_edges(
 
 def draw_edges_delayed(
     ax: Axes,
-    time_links: List,
-    time_node_community_mapping: Dict,
-    color_mapping: Dict,
+    time_links: list,
+    time_node_community_mapping: dict,
+    color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
     edge_flatten_factor: float,
@@ -441,7 +433,7 @@ def draw_edges_delayed(
     """
     # For undirected graphs, lago LinkStream returns both A→B and B→A
     # We need to filter to only draw each unique edge once
-    seen_edges: Set = set()
+    seen_edges: set = set()
 
     for source, target, source_time, target_time, weight in time_links:
         # Skip if we already drew the reverse edge (for undirected graphs)
@@ -485,7 +477,7 @@ def draw_edges_delayed(
             draw_arrow_head(ax, center1, center2, "black", edge_alpha, weight)
 
 
-def draw_night_highlights(ax: Axes, nights: List, end_nodes: Dict):
+def draw_night_highlights(ax: Axes, nights: list, end_nodes: dict):
     """
     Draw vertical lines to highlight night periods.
 

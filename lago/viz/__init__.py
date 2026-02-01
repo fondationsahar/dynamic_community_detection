@@ -26,16 +26,14 @@ __version__ = "1.1.0"
 # Check for required dependencies before importing anything
 def _check_viz_dependencies():
     """Check that visualization dependencies are installed."""
+    import importlib.util
+
     missing = []
 
-    try:
-        import matplotlib
-    except ImportError:
+    if importlib.util.find_spec("matplotlib") is None:
         missing.append("matplotlib")
 
-    try:
-        import sklearn
-    except ImportError:
+    if importlib.util.find_spec("sklearn") is None:
         missing.append("scikit-learn")
 
     if missing:

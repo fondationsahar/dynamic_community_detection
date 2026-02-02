@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import sys
 import warnings
 from itertools import pairwise
@@ -15,9 +14,6 @@ if TYPE_CHECKING:
 from lago.algorithm._internal._leaf import Leaf
 from lago.algorithm._internal._time_edge import TimeEdge
 from lago.core.enums import LinkStreamMode
-
-# Configure module logger
-logger = logging.getLogger(__name__)
 
 # NOTE Add a function to preprocess time scale:
 # min should be 0 and min step should be 1 (use pgcd etc.)

@@ -29,7 +29,7 @@ lago_modules(
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
     refinement_in: bool = True,
-    verbose: bool = False,
+    verbose: bool | int = 0,
     stopping_criterion: float = 1e-8,
     ndigits_logs: int = 8,
 ) -> TimeModules
@@ -47,7 +47,7 @@ lago_modules(
 | `refinement` | `str \| None` | `"STEM"` | Refinement strategy: `None`, `"STNM"`, or `"STEM"` |
 | `fast_exploration` | `bool` | `True` | Use fast exploration (faster but may find lower quality) |
 | `refinement_in` | `bool` | `True` | Apply refinement within main loop |
-| `verbose` | `bool` | `False` | Print progress information |
+| `verbose` | `bool \| int` | `0` | Verbosity level: `0`=silent, `1`=progress, `2`=debug. Accepts `bool` for backward compatibility |
 | `stopping_criterion` | `float` | `1e-8` | Convergence threshold |
 | `ndigits_logs` | `int` | `8` | Decimal places for logging |
 
@@ -391,13 +391,27 @@ plot.configure_edges(
 
 ```python
 plot.configure_communities(
-    max_shown: int | None = None,         # Limit communities shown
-    color_palette: str = "tab10",         # Matplotlib colormap
-    height: float = 0.8,                  # Rectangle height
-    focus_communities: dict | None = None, # {label: color} to highlight
-    show_unfocused: bool = True,
-    unfocused_style: str = "lighter",
+    communities: TimeModules,              # Communities to display
+    max_shown: int = -1,                   # Limit total colored (-1 = no limit)
+    color_palette: str = "tab10",          # Matplotlib colormap (default: "tab10")
+    height: float = 0.8,                   # Rectangle height
+    focus_communities: list | dict = None, # Labels to focus, or {label: color}
 )
+```
+
+**Auto-fill with explicit colors:** When `focus_communities` is a dict with explicit colors AND `max_shown` is set, remaining slots are automatically filled with the biggest unfocused communities using remaining palette colors.
+
+```python
+# Example: Explicit colors + auto-fill remaining slots
+plot.configure_communities(
+    communities=tm,
+    focus_communities={0: 'blue', 1: 'red', 2: 'green'},  # 3 focused with explicit colors
+    max_shown=10,  # 7 more get remaining tab10 colors (default palette)
+)
+# Result:
+# - 0, 1, 2 → explicit colors (blue, red, green)
+# - 3-9 (next biggest) → remaining tab10 colors
+# - 10+ → gainsboro (background)
 ```
 
 #### configure_display()

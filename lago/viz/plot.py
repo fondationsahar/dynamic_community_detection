@@ -147,10 +147,7 @@ class LongitudinalModulesPlot:
         self.node_focus: NodeFocus = []
         self.community_focus: list[Any] = []  # List of community labels to focus on
         self._community_focus_colors: dict[Any, Any] = {}  # Explicit colors for focused communities
-        self.show_unfocused_communities: bool = False  # Show non-focused communities
-        self.unfocused_style: str = "transparent"  # Style for unfocused communities
-        self.unfocused_alpha: float = 0.3  # Alpha for unfocused communities
-        self.background_color: Any = DEFAULT_BACKGROUND_COMMUNITY_COLOR  # Tier 3 color
+        self.background_color: Any = DEFAULT_BACKGROUND_COMMUNITY_COLOR
         self.time_focus: TimePoint | None = None
         self.node_OR_time_focus: bool = False
         self.nodes_to_display: list[int] | None = None
@@ -179,7 +176,7 @@ class LongitudinalModulesPlot:
             0.0  # For delayed edges: curve intensity (positive=right, negative=left)
         )
         self.show_edge_orientation: bool = False
-        self.color_palette: str | Sequence[Any] | None = None
+        self.color_palette: str | Sequence[Any] = "tab10"
 
         # Label settings
         self.display_xticks_labels: bool = False
@@ -726,10 +723,10 @@ class LongitudinalModulesPlot:
 
     def set_background_community_color(self, color: Any) -> "LongitudinalModulesPlot":
         """
-        Set the color for Tier 3 (background) communities.
+        Set the color for background communities.
 
-        Tier 3 communities are those that are neither focused (Tier 1) nor
-        secondary (Tier 2). By default, they are displayed in gainsboro (light grey).
+        Background communities are those that are neither focused nor
+        secondary. By default, they are displayed in gainsboro (light grey).
 
         Note: This sets the color for background *communities*, not the plot canvas
         background. For plot background, use matplotlib's `ax.set_facecolor()`.
@@ -757,60 +754,6 @@ class LongitudinalModulesPlot:
             >>> plot.set_background_community_color('lavender')
         """
         self.background_color = color
-        return self
-
-    def set_unfocused_style(
-        self,
-        show: bool = True,
-        style: str = "transparent",
-        intensity: float = 0.3,
-    ) -> "LongitudinalModulesPlot":
-        """
-        Configure how non-focused communities (Tier 2) are displayed.
-
-        When using set_focus_communities() or set_focus_nodes(), you can choose
-        to still display the other communities with a de-emphasized visual style.
-
-        Args:
-            show: Whether to show unfocused communities (default: True).
-            style: Visual style for unfocused communities. Options:
-                - "transparent": Same colors but with reduced alpha (semi-transparent)
-                - "grey": Display in grey/gainsboro color (no differentiation)
-                - "desaturated": Display with desaturated (greyed-out) versions of colors
-                - "lighter": Display with lighter/pastel versions of their colors
-            intensity: Controls the de-emphasis intensity (0.0 to 1.0). Default is 0.3.
-                - For "transparent": alpha value (0=invisible, 1=fully opaque)
-                - For "desaturated": desaturation factor (0=no change, 1=fully grey)
-                - For "lighter": lightening factor (0=no change, 1=fully white)
-                - For "grey": ignored (always uses gainsboro)
-                Lower values = closer to Tier 1 (more visible)
-                Higher values = closer to Tier 3 (less visible)
-
-        Returns:
-            Self for method chaining.
-
-        Example:
-            >>> # Semi-transparent secondary tier (subtle visibility)
-            >>> plot.set_unfocused_style(show=True, style='transparent', intensity=0.3)
-            >>>
-            >>> # More visible secondary tier
-            >>> plot.set_unfocused_style(show=True, style='desaturated', intensity=0.2)
-            >>>
-            >>> # Very de-emphasized secondary tier
-            >>> plot.set_unfocused_style(show=True, style='lighter', intensity=0.7)
-            >>>
-            >>> # Hide unfocused communities completely
-            >>> plot.set_unfocused_style(show=False)
-        """
-        valid_styles = {"transparent", "grey", "desaturated", "lighter"}
-        if style not in valid_styles:
-            raise ValueError(f"Invalid style '{style}'. Must be one of: {', '.join(valid_styles)}")
-        if not 0.0 <= intensity <= 1.0:
-            raise ValueError(f"intensity must be between 0.0 and 1.0, got {intensity}")
-
-        self.show_unfocused_communities = show
-        self.unfocused_style = style
-        self.unfocused_alpha = intensity  # Keep internal name for compatibility
         return self
 
     def set_node_style(
@@ -1109,45 +1052,34 @@ class LongitudinalModulesPlot:
         # Focus configuration
         focus_communities: list[Any] | dict[Any, Any] | None = None,
         focus_nodes: list[NodeId] | None = None,
-        # Unfocused style
-        show_unfocused: bool = False,
-        unfocused_style: str = "transparent",
-        unfocused_intensity: float = 0.3,
     ) -> "LongitudinalModulesPlot":
         """
         Configure all community-related settings in one call.
 
-        This is a simplified API that consolidates:
-        - set_communities()
-        - set_community_style()
-        - set_color_palette()
-        - set_background_community_color()
-        - set_monochrome()
-        - set_focus_communities()
-        - set_unfocused_style()
+        When focus_communities is a dict with explicit colors AND max_shown is set,
+        the remaining slots are automatically filled with the biggest unfocused
+        communities using remaining palette colors.
 
         Note: You can specify either focus_communities OR focus_nodes, but not both.
 
         Args:
             communities: Dictionary mapping community labels to list of (node, time) tuples.
             max_shown: Maximum number of communities to show (-1 for all).
+                When focus_communities is a dict, this fills remaining slots with
+                the biggest unfocused communities.
             hide_self: Whether to hide single-node communities.
             margin_segment: Margin between community segments.
             height: Height of community rectangles (0.0 to 1.0).
 
             Color configuration:
             color_palette: Color palette (matplotlib colormap name or list of colors).
-            background_color: Color for Tier 3 (background) communities.
+            background_color: Color for background communities.
             monochrome: Whether to use monochrome color scheme.
 
             Focus configuration:
             focus_communities: List of community labels to focus, or dict mapping labels to colors.
+                When a dict, remaining communities up to max_shown get palette colors.
             focus_nodes: List of node indices to focus on (alternative to focus_communities).
-
-            Unfocused style:
-            show_unfocused: Whether to show unfocused communities.
-            unfocused_style: Style for unfocused communities ('transparent', 'grey', 'desaturated', 'lighter').
-            unfocused_intensity: De-emphasis intensity (0.0 to 1.0).
 
         Returns:
             Self for method chaining.
@@ -1161,16 +1093,14 @@ class LongitudinalModulesPlot:
             ...     communities=dynamic_communities,
             ...     max_shown=10,
             ...     color_palette="tab20",
-            ...     height=0.75,
             ... )
             >>>
-            >>> # With focused communities and custom colors
+            >>> # Explicit colors for focused + auto-fill remaining slots
             >>> plot.configure_communities(
             ...     communities=dynamic_communities,
-            ...     focus_communities={'com_1': 'red', 'com_2': 'blue'},
-            ...     show_unfocused=True,
-            ...     unfocused_style='lighter',
-            ...     unfocused_intensity=0.5,
+            ...     focus_communities={0: 'blue', 1: 'red', 2: 'green'},  # 3 focused
+            ...     color_palette='tab10',
+            ...     max_shown=10,  # 7 more get remaining tab10 colors
             ... )
         """
         if focus_communities is not None and focus_nodes is not None:
@@ -1204,13 +1134,6 @@ class LongitudinalModulesPlot:
             self.set_focus_communities(focus_communities)
         elif focus_nodes is not None:
             self.set_focus_nodes(focus_nodes)
-
-        # Set unfocused style
-        self.set_unfocused_style(
-            show=show_unfocused,
-            style=unfocused_style,
-            intensity=unfocused_intensity,
-        )
 
         return self
 
@@ -1536,9 +1459,9 @@ class LongitudinalModulesPlot:
             for key, elems in communities_dict.items()
         }
 
-        # THREE-TIER COMMUNITY SYSTEM:
-        # 1. Primary/Focused: specified communities with full-color visibility
-        # 2. Secondary: biggest remaining communities until max_shown, de-emphasized colors
+        # COMMUNITY COLOR SYSTEM:
+        # 1. Focused: specified communities with full-color visibility
+        # 2. Secondary: biggest remaining communities until max_shown
         # 3. Background: all remaining communities in gainsboro
 
         # Step 1: Determine primary/focused communities
@@ -1578,7 +1501,17 @@ class LongitudinalModulesPlot:
         self._secondary_communities = {}
         self._background_communities = {}
 
-        if self.show_unfocused_communities and remaining_communities:
+        # Auto-enable secondary tier if:
+        # - explicit colors provided (focus_communities dict) AND
+        # - max_shown is set AND
+        # - there are remaining slots to fill
+        auto_enable_secondary = (
+            self._community_focus_colors
+            and self.max_shown_communities > -1
+            and self.max_shown_communities > len(self._focused_communities)
+        )
+
+        if auto_enable_secondary and remaining_communities:
             # Sort remaining by size (descending)
             remaining_sorted = sorted(
                 remaining_communities.items(),
@@ -1678,28 +1611,22 @@ class LongitudinalModulesPlot:
             self._remapped_communities
         )
 
-        # Generate THREE-TIER color mapping:
-        # 1. Primary (focused): full-color from palette
-        # 2. Secondary: de-emphasized colors (using unfocused_style)
-        # 3. Background: gainsboro
+        # Generate color mapping:
+        # - Focused: full-color from palette (or explicit colors if provided)
+        # - Secondary: remaining palette colors
+        # - Background: gainsboro
+        # Pass explicit colors so that palette excludes similar colors
         self._color_mapping = generate_color_mapping(
             self._focused_communities,
             self._secondary_communities,
             self.monochrome,
             self.color_palette,
-            unfocused_style=self.unfocused_style,
-            unfocused_alpha=self.unfocused_alpha,
+            explicit_colors=self._community_focus_colors if self._community_focus_colors else None,
         )
 
-        # Add background color for all background communities (Tier 3)
+        # Add background color for all background communities
         for label in self._background_communities:
             self._color_mapping[label] = self.background_color
-
-        # Apply explicit colors from community_focus if provided
-        if self._community_focus_colors:
-            for label, color in self._community_focus_colors.items():
-                if label in self._color_mapping:
-                    self._color_mapping[label] = color
 
     def _auto_node_ordering(self) -> NodesMapping:
         """

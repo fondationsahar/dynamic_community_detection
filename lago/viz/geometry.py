@@ -12,8 +12,6 @@ Key Functions:
     - draw_arrow_head: Draw arrow heads for directed edges
 """
 
-from typing import List, Tuple, Union
-
 import matplotlib.patches as patches
 import numpy as np
 from matplotlib.axes import Axes
@@ -22,12 +20,12 @@ from matplotlib.patches import FancyArrowPatch
 
 
 def create_center_cross(
-    center: Tuple[float, float],
+    center: tuple[float, float],
     size: float = 0.05,
     color: str = "black",
     linewidth: float = 0.5,
     alpha: float = 1.0,
-) -> List[Line2D]:
+) -> list[Line2D]:
     """
     Create cross markers at two center points.
 
@@ -63,15 +61,15 @@ def create_center_cross(
 
 
 def create_edge_arc(
-    center1: Tuple[float, float],
-    center2: Tuple[float, float],
+    center1: tuple[float, float],
+    center2: tuple[float, float],
     alpha: float = 1,
     flatten_factor: float = 0.7,
     color: str = "black",
     linewidth: float = 0.5,
     straight: bool = False,
     curve_intensity: float = 0.0,
-) -> Union[patches.Arc, FancyArrowPatch]:
+) -> patches.Arc | FancyArrowPatch:
     """
     Create an arc patch for edges.
 
@@ -93,6 +91,7 @@ def create_edge_arc(
     if straight:
         # For delayed linkstreams - use FancyArrowPatch with optional curve
         # Positive rad curves right, negative curves left
+        # shrinkA=0, shrinkB=0 ensures edge starts/ends exactly at center points
         arc = FancyArrowPatch(
             center1,
             center2,
@@ -101,12 +100,12 @@ def create_edge_arc(
             linewidth=linewidth / 2,
             alpha=alpha,
             clip_on=True,  # Clip curves to axes bounds to prevent extra padding
+            shrinkA=0,  # Don't shrink from start point
+            shrinkB=0,  # Don't shrink from end point
         )
         return arc
 
-    radius = (
-        np.sqrt((center2[0] - center1[0]) ** 2 + (center2[1] - center1[1]) ** 2) / 2
-    )
+    radius = np.sqrt((center2[0] - center1[0]) ** 2 + (center2[1] - center1[1]) ** 2) / 2
     angle1 = np.arctan2(center2[1] - center1[1], center2[0] - center1[0])
     angle2 = angle1 + np.pi
 
@@ -115,9 +114,7 @@ def create_edge_arc(
     angle2_deg = np.degrees(angle2)
 
     arc_width = 2 * radius
-    arc_height = (
-        arc_width / abs(center1[1] - center2[1]) ** 0.5 * 0.9
-    ) * flatten_factor
+    arc_height = (arc_width / abs(center1[1] - center2[1]) ** 0.5 * 0.9) * flatten_factor
 
     # Handle potential NaN values
     if np.isnan(arc_height):
@@ -174,8 +171,8 @@ def create_highlight_rectangle(
 
 def draw_arrow_head(
     ax: Axes,
-    center1: Tuple[float, float],
-    center2: Tuple[float, float],
+    center1: tuple[float, float],
+    center2: tuple[float, float],
     color: str,
     alpha: float = 1,
     linewidth: float = 0.5,

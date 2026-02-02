@@ -17,6 +17,8 @@ from .utils import (
     get_module_duration,
     get_nodes_durations,
     get_nodes_times,
+    log_debug,
+    log_info,
 )
 
 __all__ = [
@@ -32,4 +34,7 @@ __all__ = [
     "get_module_duration",
     "get_nodes_durations",
     "get_nodes_times",
+    # Logging
+    "log_debug",
+    "log_info",
 ]

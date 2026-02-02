@@ -5,6 +5,39 @@ import numpy as np  # type: ignore
 from lago.algorithm._internal import lago_tools as lts
 from lago.algorithm._internal._leaf import Leaf
 
+# ===========================================================================
+# Logging Helpers
+# ===========================================================================
+
+
+def log_info(message: str, verbose: int | bool) -> None:
+    """Print info message if verbose >= 1.
+
+    Args:
+        message: Message to print.
+        verbose: Verbosity level (0=silent, 1=info, 2=debug).
+    """
+    v = int(verbose) if isinstance(verbose, bool) else verbose
+    if v >= 1:
+        print(message)
+
+
+def log_debug(message: str, verbose: int | bool) -> None:
+    """Print debug message if verbose >= 2.
+
+    Args:
+        message: Message to print.
+        verbose: Verbosity level (0=silent, 1=info, 2=debug).
+    """
+    v = int(verbose) if isinstance(verbose, bool) else verbose
+    if v >= 2:
+        print(message)
+
+
+# ===========================================================================
+# Module Utilities
+# ===========================================================================
+
 
 def get_module_duration(module_leaves: set[Leaf]) -> float:
     """Compute the duration of a module.

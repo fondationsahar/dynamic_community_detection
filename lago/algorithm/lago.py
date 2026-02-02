@@ -9,6 +9,7 @@ from lago.algorithm._internal.runner import lago_run
 from lago.core.enums import LexType
 from lago.core.linkstream import LinkStream
 from lago.core.time_modules import TimeModules
+from lago.core.utils import log_debug, log_info
 
 
 def lago_modules(
@@ -20,7 +21,7 @@ def lago_modules(
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
     refinement_in: bool = True,
-    verbose: bool = False,
+    verbose: bool | int = 0,
     stopping_criterion: float = 1e-8,
     ndigits_logs: int = 8,
 ) -> TimeModules:
@@ -54,7 +55,9 @@ def lago_modules(
             Applying within implies more exploration, which may result in better
             results or more chances to get stuck in local optimum. More time-consuming.
             Defaults to True.
-        verbose: Whether to print intermediate reports. Defaults to False.
+        verbose: Verbosity level. 0=silent, 1=progress info, 2=detailed debug.
+            Also accepts bool for backward compatibility (True=1, False=0).
+            Defaults to 0.
         stopping_criterion: Convergence threshold. Defaults to 1e-8.
         ndigits_logs: Number of decimal places for logging. Defaults to 8.
 
@@ -114,13 +117,22 @@ def lago_modules(
         linkstream_copy._split_continuous_linkstream()
         linkstream = linkstream_copy
 
+    # Log start info
+    log_info(
+        f"LAGO: {linkstream.nb_nodes} nodes, {linkstream.nb_edges} edges, "
+        f"lex={lex_str}, refinement={refinement}",
+        verbose,
+    )
+
     # Run LAGO algorithm (potentially multiple iterations)
     best_modularity = -sys.maxsize
     best_modules: set[_LagoModule] = set()
 
+    # Convert verbose to bool for internal lago_run (maintains backward compat)
+    verbose_bool = bool(verbose)
+
     for iteration in range(nb_iter):
-        if verbose:
-            print(f"\nStart iteration {iteration + 1}")
+        log_info(f"Starting iteration {iteration + 1}/{nb_iter}", verbose)
 
         modularity, modules = lago_run(
             linkstream,
@@ -130,7 +142,7 @@ def lago_modules(
             refinement,
             fast_exploration,
             refinement_in,
-            verbose,
+            verbose_bool,
             stopping_criterion,
             ndigits_logs,
         )
@@ -139,14 +151,14 @@ def lago_modules(
         if modularity > best_modularity:
             best_modularity = modularity
             best_modules = copy.copy(modules)
-            if verbose:
-                print(
-                    f"\n\t> [{iteration + 1}/{nb_iter}] Improvement: "
-                    f"{round(best_modularity, ndigits=ndigits_logs)}"
-                )
-        elif verbose:
-            print(f"\n\t> [{iteration + 1}/{nb_iter}] No improvement.")
+            log_info(
+                f"Iteration {iteration + 1}/{nb_iter}: improved to {round(best_modularity, ndigits=ndigits_logs)}",
+                verbose,
+            )
+        else:
+            log_debug(f"Iteration {iteration + 1}/{nb_iter}: no improvement", verbose)
 
+    log_info(f"Found {len(best_modules)} modules", verbose)
     return _convert_to_time_modules(best_modules)
 
 

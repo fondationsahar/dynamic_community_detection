@@ -35,7 +35,7 @@ def lago_modules(
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
     refinement_in: bool = True,
-    verbose: bool = False,
+    verbose: bool | int = 0,
     stopping_criterion: float = 1e-8,
     ndigits_logs: int = 8,
 ) -> TimeModules
@@ -50,7 +50,7 @@ def lago_modules(
 - **omega**: Temporal resolution (higher = smoother transitions)
 - **refinement**: Strategy (`None`, `"STEM"`, or `"STNM"`)
 - **fast_exploration**: Enable fast exploration heuristic
-- **verbose**: Print progress information
+- **verbose**: Verbosity level (`0`=silent, `1`=progress info, `2`=debug). Also accepts `bool` for backward compatibility (`True`=1, `False`=0)
 
 ### Returns
 

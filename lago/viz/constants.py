@@ -47,7 +47,7 @@ MONOCHROME_FALLBACK_COLOR: str = "gainsboro"
 """Default color for monochrome/unfocused modules."""
 
 DEFAULT_BACKGROUND_MODULE_COLOR: str = "gainsboro"
-"""Default color for Tier 3 (background) modules. Not to be confused with plot canvas background."""
+"""Default color for background modules. Not to be confused with plot canvas background."""
 
 # Backward compat alias
 DEFAULT_BACKGROUND_COMMUNITY_COLOR = DEFAULT_BACKGROUND_MODULE_COLOR

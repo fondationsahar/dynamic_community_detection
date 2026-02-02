@@ -1,12 +1,12 @@
 """
-Drawing operations module for longitudinal community plotting.
+Drawing operations module for longitudinal module plotting.
 
 This module provides functions for rendering various visual elements in the longitudinal
-community visualization. It handles drawing of community periods, nodes, edges, highlights,
+module visualization. It handles drawing of module periods, nodes, edges, highlights,
 and other graphical components.
 
 Key Functions:
-    - draw_community_periods: Draw colored rectangles for community time periods
+    - draw_module_periods: Draw colored rectangles for module time periods
     - draw_nodes: Draw horizontal lines representing nodes
     - draw_focus_highlights: Draw highlight rectangles for focused nodes/times
     - draw_edges: Draw arcs between nodes for regular linkstreams
@@ -29,45 +29,45 @@ from .geometry import (
 )
 
 
-def draw_community_periods(
+def draw_module_periods(
     ax: plt.Axes,
-    communities_nodes_segments: dict[Any, dict[Any, list[list[int]]]],
+    modules_nodes_segments: dict[Any, dict[Any, list[list[int]]]],
     color_mapping: dict[Any, Any],
-    height_community_color: float,
+    height_module_color: float,
     margin_commu_segment: float,
 ):
     """
-    Draw community periods as colored rectangles using pre-computed time segments.
+    Draw module periods as colored rectangles using pre-computed time segments.
 
     This optimized function draws rectangles for entire time segments rather than
     individual time points, significantly improving rendering performance for
-    communities with consecutive time periods.
+    modules with consecutive time periods.
 
     Args:
         ax: Matplotlib axes to draw on
-        communities_nodes_segments: Dictionary mapping community labels to node time segments
-            Structure: {community_label: {node: [[start1, end1], [start2, end2], ...]}}
-        color_mapping: Dictionary mapping community labels to colors
-        height_community_color: Height of community rectangles in plot coordinates
+        modules_nodes_segments: Dictionary mapping module labels to node time segments
+            Structure: {module_label: {node: [[start1, end1], [start2, end2], ...]}}
+        color_mapping: Dictionary mapping module labels to colors
+        height_module_color: Height of module rectangles in plot coordinates
 
     Note:
         This function assumes time segments are pre-computed and represent
-        continuous time ranges for each node within each community.
+        continuous time ranges for each node within each module.
     """
     periods = []
     # margin_commu_segment = 0.35
-    for community_label, nodes_segment in communities_nodes_segments.items():
+    for module_label, nodes_segment in modules_nodes_segments.items():
         for node, segments in nodes_segment.items():
             for segment in segments:
                 rect = Rectangle(
                     (
                         segment[0] + margin_commu_segment,
-                        node + (0.5 - height_community_color / 2),
+                        node + (0.5 - height_module_color / 2),
                     ),
                     width=segment[1] - segment[0] + 1 - 2 * margin_commu_segment,
-                    height=height_community_color,
-                    facecolor=color_mapping.get(community_label, "gainsboro"),
-                    edgecolor=color_mapping.get(community_label, "gainsboro"),
+                    height=height_module_color,
+                    facecolor=color_mapping.get(module_label, "gainsboro"),
+                    edgecolor=color_mapping.get(module_label, "gainsboro"),
                 )
 
                 periods.append(rect)
@@ -189,7 +189,7 @@ def draw_focus_highlights(
 def draw_edge_activity(
     ax: Axes,
     time_links: list,
-    time_node_community_mapping: dict,
+    time_node_module_mapping: dict,
     color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
@@ -207,10 +207,10 @@ def draw_edge_activity(
         ax: Matplotlib axes
         time_links: List of (source, target, time[, weight]) tuples.
             Weight is optional and defaults to 1.0 if not provided.
-        time_node_community_mapping: Mapping from (node, time) to community
-        color_mapping: Color mapping for communities
+        time_node_module_mapping: Mapping from (node, time) to module
+        color_mapping: Color mapping for modules
         edge_alpha: Transparency for markers
-        color_edges: Whether to color edges by community
+        color_edges: Whether to color edges by module
         edge_flatten_factor: Flattening factor for edge arcs
         show_edge_orientation: Whether to display arrow heads showing edge orientation
         is_directed: Whether the linkstream is directed
@@ -247,7 +247,7 @@ def draw_edge_activity(
 def draw_edge_activity_delayed(
     ax: Axes,
     time_links: list,
-    time_node_community_mapping: dict,
+    time_node_module_mapping: dict,
     color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
@@ -269,10 +269,10 @@ def draw_edge_activity_delayed(
         ax: Matplotlib axes
         time_links: List of (source, target, source_time, target_time[, weight]) tuples.
             Weight is optional and defaults to 1.0 if not provided.
-        time_node_community_mapping: Mapping from (node, time) to community
-        color_mapping: Color mapping for communities
+        time_node_module_mapping: Mapping from (node, time) to module
+        color_mapping: Color mapping for modules
         edge_alpha: Transparency for markers
-        color_edges: Whether to color edges by community
+        color_edges: Whether to color edges by module
         edge_flatten_factor: Flattening factor for edge arcs
         show_edge_orientation: Whether to display arrow heads showing edge orientation
         is_directed: Whether the linkstream is directed
@@ -329,7 +329,7 @@ def draw_edge_activity_delayed(
 def draw_edges(
     ax: Axes,
     time_links: list,
-    time_node_community_mapping: dict,
+    time_node_module_mapping: dict,
     color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
@@ -348,10 +348,10 @@ def draw_edges(
         time_links: List of edge tuples. Format depends on linkstream type:
             - Regular: (source, target, time, weight)
             - Continuous: (source, target, start_time, end_time, weight)
-        time_node_community_mapping: Mapping from (node, time) to community
-        color_mapping: Color mapping for communities
+        time_node_module_mapping: Mapping from (node, time) to module
+        color_mapping: Color mapping for modules
         edge_alpha: Transparency for edges
-        color_edges: Whether to color edges by community
+        color_edges: Whether to color edges by module
         edge_flatten_factor: Flattening factor for edge arcs
         show_edge_orientation: Whether to display arrow heads showing edge orientation
         is_directed: Whether the linkstream is directed
@@ -388,7 +388,7 @@ def draw_edges(
             ax=ax,
             center1=center1,
             center2=center2,
-            time_node_community_mapping=time_node_community_mapping,
+            time_node_module_mapping=time_node_module_mapping,
             color_mapping=color_mapping,
             edge_alpha=edge_alpha,
             color_edges=color_edges,
@@ -409,7 +409,7 @@ def draw_edges(
 def draw_edges_delayed(
     ax: Axes,
     time_links: list,
-    time_node_community_mapping: dict,
+    time_node_module_mapping: dict,
     color_mapping: dict,
     edge_alpha: float,
     color_edges: bool,
@@ -425,10 +425,10 @@ def draw_edges_delayed(
         ax: Matplotlib axes
         time_links: List of (source, target, source_time, target_time[, weight]) tuples.
             Weight is optional and defaults to 1.0 if not provided.
-        time_node_community_mapping: Mapping from (node, time) to community
-        color_mapping: Color mapping for communities
+        time_node_module_mapping: Mapping from (node, time) to module
+        color_mapping: Color mapping for modules
         edge_alpha: Transparency for edges
-        color_edges: Whether to color edges by community
+        color_edges: Whether to color edges by module
         edge_flatten_factor: Flattening factor for edge arcs
         show_edge_orientation: Whether to display arrow heads showing edge orientation
         is_directed: Whether the linkstream is directed
@@ -465,7 +465,7 @@ def draw_edges_delayed(
             ax=ax,
             center1=center1,
             center2=center2,
-            time_node_community_mapping=time_node_community_mapping,
+            time_node_module_mapping=time_node_module_mapping,
             color_mapping=color_mapping,
             edge_alpha=edge_alpha,
             color_edges=color_edges,

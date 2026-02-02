@@ -1,5 +1,5 @@
 """
-Core utility functions for longitudinal community plotting.
+Core utility functions for longitudinal module plotting.
 
 This module contains helper functions for node ordering and weight normalization
 that are used by the LongitudinalPlot class.
@@ -80,7 +80,7 @@ def rank_from_similarities(
 
 
 def _auto_node_ordering_given_time_modules(
-    communities: Dict,
+    modules: Dict,
     time_links: Optional[list] = None,
     factor: float = 0.9,
     subsets: list = [],
@@ -89,15 +89,15 @@ def _auto_node_ordering_given_time_modules(
     Automatically order nodes to minimize visual clutter in the plot.
 
     This function computes an optimal ordering of nodes based on:
-    1. Community co-membership (nodes in the same community should be close)
+    1. Module co-membership (nodes in the same module should be close)
     2. Edge connectivity (nodes connected by edges should be close)
 
     Args:
-        communities: Dictionary mapping community labels to list of (node, time) tuples
+        modules: Dictionary mapping module labels to list of (node, time) tuples
         time_links: List of temporal links (for connectivity-based ordering)
         nodes_to_display: Set of nodes to include in the ordering
-        factor: Weight for community-based ordering vs edge-based ordering (0-1)
-            Higher values prioritize community structure over edge structure
+        factor: Weight for module-based ordering vs edge-based ordering (0-1)
+            Higher values prioritize module structure over edge structure
 
     Returns:
         Dictionary mapping node IDs to their display position (0-indexed)
@@ -105,7 +105,7 @@ def _auto_node_ordering_given_time_modules(
     nodes_mapping = {}
     for subset in subsets:
         tmp_nodes_mapping = _auto_node_ordering_given_time_modules_forsubset(
-            communities, time_links, subset, factor
+            modules, time_links, subset, factor
         )
         tmp_nodes_mapping = {
             key: val + len(nodes_mapping) for key, val in tmp_nodes_mapping.items()
@@ -115,7 +115,7 @@ def _auto_node_ordering_given_time_modules(
 
 
 def _auto_node_ordering_given_time_modules_forsubset(
-    communities: Dict,
+    modules: Dict,
     time_links: Optional[list] = None,
     nodes_to_display: Optional[Set] = None,
     factor: float = 0.9,
@@ -124,15 +124,15 @@ def _auto_node_ordering_given_time_modules_forsubset(
     Automatically order nodes to minimize visual clutter in the plot.
 
     This function computes an optimal ordering of nodes based on:
-    1. Community co-membership (nodes in the same community should be close)
+    1. Module co-membership (nodes in the same module should be close)
     2. Edge connectivity (nodes connected by edges should be close)
 
     Args:
-        communities: Dictionary mapping community labels to list of (node, time) tuples
+        modules: Dictionary mapping module labels to list of (node, time) tuples
         time_links: List of temporal links (for connectivity-based ordering)
         nodes_to_display: Set of nodes to include in the ordering
-        factor: Weight for community-based ordering vs edge-based ordering (0-1)
-            Higher values prioritize community structure over edge structure
+        factor: Weight for module-based ordering vs edge-based ordering (0-1)
+            Higher values prioritize module structure over edge structure
 
     Returns:
         Dictionary mapping node IDs to their display position (0-indexed)
@@ -161,25 +161,25 @@ def _auto_node_ordering_given_time_modules_forsubset(
     links_weights = dict(zip(zip(df_sum["source"], df_sum["target"]), df_sum["weight"]))
     del df_sum
 
-    # Build node-to-community mapping
-    nodes_communities_times: Dict[int, Dict] = {}
-    for label, community in communities.items():
-        for node, time in community:
+    # Build node-to-module mapping
+    nodes_modules_times: Dict[int, Dict] = {}
+    for label, module in modules.items():
+        for node, time in module:
             if node not in nodes_to_display:
                 continue
-            if node not in nodes_communities_times:
-                nodes_communities_times[node] = {}
-            if label not in nodes_communities_times[node]:
-                nodes_communities_times[node][label] = set()
-            nodes_communities_times[node][label].add(time)
+            if node not in nodes_modules_times:
+                nodes_modules_times[node] = {}
+            if label not in nodes_modules_times[node]:
+                nodes_modules_times[node][label] = set()
+            nodes_modules_times[node][label].add(time)
 
     # Compute pairwise similarities
-    nodes = list(nodes_communities_times.keys())
+    nodes = list(nodes_modules_times.keys())
     similarities = []
     for node1, node2 in combinations(nodes, 2):
         all_commus, all_times = set(), set()
         for node in [node1, node2]:
-            for commu, times in nodes_communities_times[node].items():
+            for commu, times in nodes_modules_times[node].items():
                 all_commus.add(commu)
                 all_times |= times
 
@@ -187,11 +187,11 @@ def _auto_node_ordering_given_time_modules_forsubset(
         dur2 = 0
         for commu in all_commus:
             if (
-                commu in nodes_communities_times[node1]
-                and commu in nodes_communities_times[node2]
+                commu in nodes_modules_times[node1]
+                and commu in nodes_modules_times[node2]
             ):
-                dur1 += len(nodes_communities_times[node1][commu])
-                dur2 += len(nodes_communities_times[node2][commu])
+                dur1 += len(nodes_modules_times[node1][commu])
+                dur2 += len(nodes_modules_times[node2][commu])
 
         tnode1, tnode2 = sorted([node1, node2])
         links_sim = links_weights.get((tnode1, tnode2), 0)

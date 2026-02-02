@@ -112,7 +112,7 @@ def customized_plot():
     )
 
     # Configure communities
-    plot.configure_communities(
+    plot.configure_modules(
         color_palette="tab10",
         height=0.8,
     )
@@ -148,8 +148,8 @@ def focus_on_communities():
     )
 
     # Optionally focus on specific communities
-    # plot.configure_communities(
-    #     focus_communities={0: 'red'},  # Highlight community 0 in red
+    # plot.configure_modules(
+    #     focus_modules={0: 'red'},  # Highlight community 0 in red
     #     show_unfocused=True,
     #     unfocused_style='lighter',
     # )

@@ -1,8 +1,8 @@
 """
-Geometry module for longitudinal community plotting.
+Geometry module for longitudinal module plotting.
 
 This module provides geometric utility functions for creating and manipulating
-visual elements in the longitudinal community visualization. It includes functions
+visual elements in the longitudinal module visualization. It includes functions
 for creating arcs, rectangles, crosses, and arrow heads used in the plotting.
 
 Key Functions:

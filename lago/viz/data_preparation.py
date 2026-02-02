@@ -1,57 +1,57 @@
 """
-Data preparation module for longitudinal community plotting.
+Data preparation module for longitudinal module plotting.
 
-This module provides functions for preparing, filtering, and processing community data
-for longitudinal visualization. It handles community filtering based on focus criteria,
-time range calculations, community sorting, and data structure transformations.
+This module provides functions for preparing, filtering, and processing module data
+for longitudinal visualization. It handles module filtering based on focus criteria,
+time range calculations, module sorting, and data structure transformations.
 
 Key Functions:
-    - prepare_communities_for_display: Prepare communities with focus filtering
+    - prepare_modules_for_display: Prepare modules with focus filtering
     - calculate_node_time_ranges: Calculate node activity time ranges
-    - filter_and_sort_communities: Filter and sort communities by size
-    - create_time_node_community_mapping: Create community membership mapping
-    - get_communities_to_focus: Identify communities matching focus criteria
-    - sort_communities_by_size: Sort communities by membership size
+    - filter_and_sort_modules: Filter and sort modules by size
+    - create_time_node_module_mapping: Create module membership mapping
+    - get_modules_to_focus: Identify modules matching focus criteria
+    - sort_modules_by_size: Sort modules by membership size
 """
 
 from typing import Any, Collection, Dict, List, Optional, Set, Tuple
 
 
-def prepare_communities_for_display(
-    communities: Dict,
+def prepare_modules_for_display(
+    modules: Dict,
     node_focus: Optional[list],
     time_focus: Optional[int],
     node_OR_time_focus: bool,
 ) -> Tuple[Dict, Dict]:
     """
-    Prepare communities for display by filtering based on focus criteria.
+    Prepare modules for display by filtering based on focus criteria.
 
     Args:
-        communities: Original communities dictionary
+        modules: Original modules dictionary
         node_focus: Node to focus on (optional)
         time_focus: Time to focus on (optional)
         node_OR_time_focus: Whether to use OR or AND logic for focus
 
     Returns:
-        Tuple of (focused_communities, monochrome_communities)
+        Tuple of (focused_modules, monochrome_modules)
     """
     if node_focus != [] or time_focus is not None:
-        communities_to_focus = get_communities_to_focus(
-            communities, node_focus, time_focus, node_OR_time_focus
+        modules_to_focus = get_modules_to_focus(
+            modules, node_focus, time_focus, node_OR_time_focus
         )
-        communities_monochrome = {
-            label: communities[label]
-            for label in communities.keys()
-            if label not in communities_to_focus
+        modules_monochrome = {
+            label: modules[label]
+            for label in modules.keys()
+            if label not in modules_to_focus
         }
-        communities_to_display = {
-            label: communities[label] for label in communities_to_focus
+        modules_to_display = {
+            label: modules[label] for label in modules_to_focus
         }
     else:
-        communities_to_display = communities
-        communities_monochrome = {}
+        modules_to_display = modules
+        modules_monochrome = {}
 
-    return communities_to_display, communities_monochrome
+    return modules_to_display, modules_monochrome
 
 
 def calculate_node_time_ranges(
@@ -83,115 +83,115 @@ def calculate_node_time_ranges(
     return start_nodes, end_nodes
 
 
-def filter_and_sort_communities(
-    communities: Dict, max_shown_communities: int, hide_self_communities: bool
+def filter_and_sort_modules(
+    modules: Dict, max_shown_modules: int, hide_self_modules: bool
 ) -> Dict:
     """
-    Filter and sort communities based on size and display criteria.
+    Filter and sort modules based on size and display criteria.
 
     Args:
-        communities: Communities dictionary
-        max_shown_communities: Maximum number of communities to show
-        hide_self_communities: Whether to hide single-node communities
+        modules: Modules dictionary
+        max_shown_modules: Maximum number of modules to show
+        hide_self_modules: Whether to hide single-node modules
 
     Returns:
-        Filtered and sorted communities dictionary
+        Filtered and sorted modules dictionary
     """
-    if max_shown_communities > -1:
-        communities = sort_communities_by_size(communities, max_shown_communities)
+    if max_shown_modules > -1:
+        modules = sort_modules_by_size(modules, max_shown_modules)
 
-    if hide_self_communities:
+    if hide_self_modules:
         return {
-            label: community
-            for label, community in communities.items()
-            if len(community) > 1
+            label: module
+            for label, module in modules.items()
+            if len(module) > 1
         }
-    return communities
+    return modules
 
 
-def create_time_node_community_mapping(communities: Dict) -> Dict:
+def create_time_node_module_mapping(modules: Dict) -> Dict:
     """
-    Create mapping from (node, time) tuples to community labels.
+    Create mapping from (node, time) tuples to module labels.
 
     Args:
-        communities: Communities dictionary
+        modules: Modules dictionary
 
     Returns:
-        Dictionary mapping (node, time) to community label
+        Dictionary mapping (node, time) to module label
     """
-    time_node_community_mapping = {}
-    for community_label, community in communities.items():
-        for time_node in community:
-            time_node_community_mapping[time_node] = community_label
-    return time_node_community_mapping
+    time_node_module_mapping = {}
+    for module_label, module in modules.items():
+        for time_node in module:
+            time_node_module_mapping[time_node] = module_label
+    return time_node_module_mapping
 
 
-def get_communities_to_focus(
-    communities: Dict,
+def get_modules_to_focus(
+    modules: Dict,
     node_focus: Optional[List] = None,
     time_focus: Optional[int] = None,
     node_OR_time_focus: bool = False,
 ) -> Set:
     """
-    Get set of community labels that should be focused based on node/time criteria.
+    Get set of module labels that should be focused based on node/time criteria.
 
     Args:
-        communities: Communities dictionary
+        modules: Modules dictionary
         node_focus: Node to focus on
         time_focus: Time to focus on
         node_OR_time_focus: Whether to use OR logic for focus
 
     Returns:
-        Set of community labels to focus on
+        Set of module labels to focus on
     """
-    focused_communities = set()
+    focused_modules = set()
 
-    for community_label, members in communities.items():
+    for module_label, members in modules.items():
         for node, time in members:
             if node_focus is None or len(node_focus) == 0:
                 if time == time_focus:
-                    focused_communities.add(community_label)
+                    focused_modules.add(module_label)
                     break
             elif time_focus is None:
                 if node in node_focus:
-                    focused_communities.add(community_label)
+                    focused_modules.add(module_label)
                     break
             else:
                 if node_OR_time_focus:
                     if time == time_focus or node in node_focus:
-                        focused_communities.add(community_label)
+                        focused_modules.add(module_label)
                         break
                 else:
                     if time == time_focus and node in node_focus:
-                        focused_communities.add(community_label)
+                        focused_modules.add(module_label)
                         break
 
-    return focused_communities
+    return focused_modules
 
 
-def sort_communities_by_size(communities: Dict, top_n: int = 20) -> Dict:
+def sort_modules_by_size(modules: Dict, top_n: int = 20) -> Dict:
     """
-    Sort communities by size and return top N.
+    Sort modules by size and return top N.
 
     Args:
-        communities: Communities dictionary
-        top_n: Number of top communities to return
+        modules: Modules dictionary
+        top_n: Number of top modules to return
 
     Returns:
-        Dictionary of top N communities sorted by size
+        Dictionary of top N modules sorted by size
     """
-    # Create list of (community_index, size) tuples
-    community_sizes = {lab: len(community) for lab, community in communities.items()}
+    # Create list of (module_index, size) tuples
+    module_sizes = {lab: len(module) for lab, module in modules.items()}
 
     # Sort by size in descending order
-    sorted_sizes = sorted(community_sizes.items(), key=lambda x: x[1], reverse=True)[
+    sorted_sizes = sorted(module_sizes.items(), key=lambda x: x[1], reverse=True)[
         :top_n
     ]
     return dict(sorted_sizes)
-    # Return top N communities
+    # Return top N modules
     # result = {}
     # for i in range(min(top_n, len(sorted_sizes))):
     #     original_index = sorted_sizes[i][0]
-    #     result[original_index] = list(communities.values())[original_index]
+    #     result[original_index] = list(modules.values())[original_index]
 
     # return result

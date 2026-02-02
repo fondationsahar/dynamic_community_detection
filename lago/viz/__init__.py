@@ -7,7 +7,7 @@ This subpackage requires optional dependencies:
     pip install dcd-lago[viz]
 
 This library provides an object-oriented API (LongitudinalModulesPlot) for creating
-temporal community visualizations with matplotlib.
+temporal module visualizations with matplotlib.
 
 Example:
     >>> from lago import LongitudinalModulesPlot
@@ -15,7 +15,7 @@ Example:
     >>> plot = LongitudinalModulesPlot(linkstream, width=1600, height=1200)
     >>> plot.configure_nodes(nodes=node_list, labels=labels, auto_ordering=True)
     >>> plot.configure_edges(show_edges=False, show_activity=True)
-    >>> plot.configure_communities(communities=time_modules, color_palette="tab20")
+    >>> plot.configure_modules(modules=time_modules, color_palette="tab20")
     >>> plot.draw()
     >>> plot.save("output.png", dpi=750)
 """
@@ -74,14 +74,14 @@ from .constants import (
 # Data preparation functions
 from .data_preparation import (
     calculate_node_time_ranges,
-    create_time_node_community_mapping,
-    filter_and_sort_communities,
-    prepare_communities_for_display,
+    create_time_node_module_mapping,
+    filter_and_sort_modules,
+    prepare_modules_for_display,
 )
 
 # Drawing functions
 from .drawing import (
-    draw_community_periods,
+    draw_module_periods,
     draw_edge_activity,
     draw_edges,
     draw_edges_delayed,
@@ -102,15 +102,15 @@ from .plot import LongitudinalModulesPlot
 # Main API
 from .types import (
     ColorMapping,
-    Communities,
-    CommunityLabel,
-    CommunityMember,
-    CommunityNodesSegments,
+    Modules,
+    ModuleLabel,
+    ModuleMember,
+    ModuleNodesSegments,
     NodeFocus,
     NodeId,
     NodesMapping,
     TimeLinks,
-    TimeNodeCommunityMapping,
+    TimeNodeModuleMapping,
     TimePoint,
 )
 
@@ -127,15 +127,15 @@ __all__ = [
     "LongitudinalModulesPlot",
     # Type definitions
     "ColorMapping",
-    "Communities",
-    "CommunityLabel",
-    "CommunityMember",
-    "CommunityNodesSegments",
+    "Modules",
+    "ModuleLabel",
+    "ModuleMember",
+    "ModuleNodesSegments",
     "NodeFocus",
     "NodeId",
     "NodesMapping",
     "TimeLinks",
-    "TimeNodeCommunityMapping",
+    "TimeNodeModuleMapping",
     "TimePoint",
     # Constants
     "DEFAULT_COMMUNITY_HEIGHT",
@@ -161,11 +161,11 @@ __all__ = [
     "setup_figure_and_axes",
     # Data preparation
     "calculate_node_time_ranges",
-    "create_time_node_community_mapping",
-    "filter_and_sort_communities",
-    "prepare_communities_for_display",
+    "create_time_node_module_mapping",
+    "filter_and_sort_modules",
+    "prepare_modules_for_display",
     # Drawing
-    "draw_community_periods",
+    "draw_module_periods",
     "draw_edge_activity",
     "draw_edges",
     "draw_edges_delayed",

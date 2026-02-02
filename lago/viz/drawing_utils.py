@@ -1,5 +1,5 @@
 """
-Drawing utility functions for longitudinal community plotting.
+Drawing utility functions for longitudinal module plotting.
 
 This module contains helper functions to reduce code duplication in the main drawing module.
 """
@@ -15,7 +15,7 @@ def _draw_edge_common(
     ax: Axes,
     center1: Tuple[float, float],
     center2: Tuple[float, float],
-    time_node_community_mapping: Dict,
+    time_node_module_mapping: Dict,
     color_mapping: Dict,
     edge_alpha: float,
     color_edges: bool,
@@ -35,10 +35,10 @@ def _draw_edge_common(
         ax: Matplotlib axes
         center1: First center point (x, y)
         center2: Second center point (x, y)
-        time_node_community_mapping: Mapping from (node, time) to community
-        color_mapping: Color mapping for communities
+        time_node_module_mapping: Mapping from (node, time) to module
+        color_mapping: Color mapping for modules
         edge_alpha: Transparency for edges
-        color_edges: Whether to color edges by community
+        color_edges: Whether to color edges by module
         source_node: Source node
         target_node: Target node
         source_time: Source time
@@ -55,11 +55,11 @@ def _draw_edge_common(
     end_center = center2 if straight else center1
 
     if color_edges:
-        source_community = time_node_community_mapping.get((source_node, source_time))
-        target_community = time_node_community_mapping.get((target_node, target_time))
+        source_module = time_node_module_mapping.get((source_node, source_time))
+        target_module = time_node_module_mapping.get((target_node, target_time))
 
-        if source_community is None or target_community is None:
-            # No community info - draw default edge
+        if source_module is None or target_module is None:
+            # No module info - draw default edge
             arc = create_edge_arc(
                 start_center,
                 end_center,
@@ -72,8 +72,8 @@ def _draw_edge_common(
             ax.add_patch(arc)
             return
 
-        if source_community != target_community:
-            # Different communities - draw default edge
+        if source_module != target_module:
+            # Different modules - draw default edge
             arc = create_edge_arc(
                 start_center,
                 end_center,
@@ -86,8 +86,8 @@ def _draw_edge_common(
             ax.add_patch(arc)
             return
 
-        # Same community - draw colored edge
-        color = color_mapping.get(source_community)
+        # Same module - draw colored edge
+        color = color_mapping.get(source_module)
 
         if color is None or (isinstance(color, str) and color == "gainsboro"):
             arc = create_edge_arc(

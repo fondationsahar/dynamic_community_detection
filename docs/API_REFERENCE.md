@@ -387,25 +387,25 @@ plot.configure_edges(
 )
 ```
 
-#### configure_communities()
+#### configure_modules()
 
 ```python
-plot.configure_communities(
+plot.configure_modules(
     communities: TimeModules,              # Communities to display
     max_shown: int = -1,                   # Limit total colored (-1 = no limit)
     color_palette: str = "tab10",          # Matplotlib colormap (default: "tab10")
     height: float = 0.8,                   # Rectangle height
-    focus_communities: list | dict = None, # Labels to focus, or {label: color}
+    focus_modules: list | dict = None, # Labels to focus, or {label: color}
 )
 ```
 
-**Auto-fill with explicit colors:** When `focus_communities` is a dict with explicit colors AND `max_shown` is set, remaining slots are automatically filled with the biggest unfocused communities using remaining palette colors.
+**Auto-fill with explicit colors:** When `focus_modules` is a dict with explicit colors AND `max_shown` is set, remaining slots are automatically filled with the biggest unfocused communities using remaining palette colors.
 
 ```python
 # Example: Explicit colors + auto-fill remaining slots
-plot.configure_communities(
+plot.configure_modules(
     communities=tm,
-    focus_communities={0: 'blue', 1: 'red', 2: 'green'},  # 3 focused with explicit colors
+    focus_modules={0: 'blue', 1: 'red', 2: 'green'},  # 3 focused with explicit colors
     max_shown=10,  # 7 more get remaining tab10 colors (default palette)
 )
 # Result:
@@ -470,7 +470,7 @@ plot.configure_edges(
     activity_alpha=0.4,
 )
 
-plot.configure_communities(
+plot.configure_modules(
     color_palette="tab10",
     height=0.8,
 )

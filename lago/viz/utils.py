@@ -1,14 +1,14 @@
 """
-Utility functions module for longitudinal community plotting.
+Utility functions module for longitudinal module plotting.
 
 This module provides utility functions for color generation, data segmentation,
-and other helper operations used throughout the longitudinal community visualization pipeline.
+and other helper operations used throughout the longitudinal module visualization pipeline.
 
 Functions:
     - generate_monochrome_colors: Generate monochrome color palette
     - generate_pastel_colors: Generate pastel color palette
     - generate_colors_from_palette: Generate colors from custom palette or colormap
-    - generate_color_mapping: Create color mapping for communities
+    - generate_color_mapping: Create color mapping for modules
     - to_segments: Convert time points to continuous segments for optimization
 """
 
@@ -207,48 +207,48 @@ def _colors_are_similar(color1: ColorType, color2: ColorType, threshold: float =
 
 
 def generate_color_mapping(
-    focused_communities: dict,
-    secondary_communities: dict,
+    focused_modules: dict,
+    secondary_modules: dict,
     monochrome: bool,
     palette: ColorPalette | None = None,
     explicit_colors: dict[Any, ColorType] | None = None,
 ) -> dict:
     """
-    Generate color mapping for communities.
+    Generate color mapping for modules.
 
-    Focused communities get colors from the palette (or explicit colors if provided).
-    Secondary communities get the remaining palette colors.
+    Focused modules get colors from the palette (or explicit colors if provided).
+    Secondary modules get the remaining palette colors.
 
-    When explicit_colors is provided, those colors are used for focused communities
+    When explicit_colors is provided, those colors are used for focused modules
     that have explicit assignments, and the remaining palette colors (excluding
-    those similar to explicit colors) are used for other communities.
+    those similar to explicit colors) are used for other modules.
 
     Args:
-        focused_communities: Focused communities to display with colors
-        secondary_communities: Secondary communities to display with remaining colors
+        focused_modules: Focused modules to display with colors
+        secondary_modules: Secondary modules to display with remaining colors
         monochrome: Whether to use monochrome scheme
         palette: Optional color palette specification. Can be:
             - None: Uses default colors (pastel or monochrome)
             - str: Name of a matplotlib colormap (e.g., 'viridis', 'tab10', 'Set2')
             - Sequence of colors: List of color specifications
-        explicit_colors: Optional dict mapping community labels to explicit colors.
+        explicit_colors: Optional dict mapping module labels to explicit colors.
             These colors will be used directly and excluded from palette assignment.
 
     Returns:
-        Dictionary mapping community labels to colors
+        Dictionary mapping module labels to colors
     """
     explicit_colors = explicit_colors or {}
 
     if monochrome:
-        colors = generate_monochrome_colors(len(focused_communities))
-        secondary_colors = ["gainsboro"] * (len(secondary_communities) + 1)
+        colors = generate_monochrome_colors(len(focused_modules))
+        secondary_colors = ["gainsboro"] * (len(secondary_modules) + 1)
     else:
         # Generate palette colors
-        # We need enough colors for all communities that don't have explicit colors
+        # We need enough colors for all modules that don't have explicit colors
         n_focused_no_explicit = sum(
-            1 for label in focused_communities if label not in explicit_colors
+            1 for label in focused_modules if label not in explicit_colors
         )
-        n_secondary = len(secondary_communities)
+        n_secondary = len(secondary_modules)
         total_needed = n_focused_no_explicit + n_secondary
 
         # Generate more colors than needed so we can filter out similar ones
@@ -266,9 +266,9 @@ def generate_color_mapping(
                     filtered_colors.append(color)
             all_colors = filtered_colors if filtered_colors else all_colors
 
-        # Assign colors to focused communities
+        # Assign colors to focused modules
         colors = []
-        focused_labels = list(focused_communities.keys())
+        focused_labels = list(focused_modules.keys())
         color_idx = 0
 
         for label in focused_labels:
@@ -284,25 +284,25 @@ def generate_color_mapping(
                     # Fallback to pastel if we run out
                     colors.append(generate_pastel_colors(1)[0])
 
-        # Remaining colors for secondary communities
+        # Remaining colors for secondary modules
         remaining_colors = all_colors[color_idx:] if color_idx < len(all_colors) else []
 
-        # Secondary communities get remaining palette colors
-        secondary_colors = remaining_colors[: len(secondary_communities)]
+        # Secondary modules get remaining palette colors
+        secondary_colors = remaining_colors[: len(secondary_modules)]
         # Pad with gainsboro if not enough colors
-        while len(secondary_colors) < len(secondary_communities):
+        while len(secondary_colors) < len(secondary_modules):
             secondary_colors.append("gainsboro")
 
-    # Create color mapping for focused communities
+    # Create color mapping for focused modules
     color_mapping = {
-        community_label: color for color, community_label in zip(colors, focused_communities.keys())
+        module_label: color for color, module_label in zip(colors, focused_modules.keys())
     }
 
-    # Add secondary communities to mapping
+    # Add secondary modules to mapping
     color_mapping.update(
         {
-            community_label: color
-            for color, community_label in zip(secondary_colors, secondary_communities.keys())
+            module_label: color
+            for color, module_label in zip(secondary_colors, secondary_modules.keys())
         }
     )
 

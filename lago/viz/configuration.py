@@ -1,5 +1,5 @@
 """
-Visual configuration module for longitudinal community plotting.
+Visual configuration module for longitudinal module plotting.
 
 This module provides functions for setting up and configuring the visualization layout,
 axes, and final plot appearance. It handles figure creation, axis configuration,
@@ -18,7 +18,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 
-def setup_figure_and_axes(width: int, height: int) -> Tuple[Figure, Axes]:
+def setup_figure_and_axes(width: int, height: int) -> tuple[Figure, Axes]:
     """
     Set up the matplotlib figure and axes with appropriate dimensions.
 
@@ -32,7 +32,7 @@ def setup_figure_and_axes(width: int, height: int) -> Tuple[Figure, Axes]:
     width_inches = width / 100
     height_inches = height / 100 * 0.75
     fig, ax = plt.subplots(1, figsize=(width_inches, height_inches), dpi=100)
-    return fig, cast(Axes, ax)
+    return fig, cast("Axes", ax)
 
 
 def configure_axes(
@@ -73,9 +73,7 @@ def configure_axes(
         if len(tmp_current_xticks) > 0:
             current_xticks.append(tmp_current_xticks[-1])
 
-        interval = (
-            current_xticks[1] - current_xticks[0] if len(current_xticks) > 1 else 1.0
-        )
+        interval = current_xticks[1] - current_xticks[0] if len(current_xticks) > 1 else 1.0
         new_xticks = [x + interval for x in current_xticks]
         new_xticks = list(range(int(min(new_xticks)), int(max(new_xticks)) + 1))
         new_xticks = [tck - 0.5 for tck in new_xticks]
@@ -100,6 +98,7 @@ def configure_axes(
             ax.set_yticks(new_yticks)
             ax.set_yticklabels(node_labels, fontsize=node_label_fontsize)
             ax.tick_params(axis="y", pad=ylabel_padding)
+
             for tick, label_text in zip(ax.get_yticklabels(), node_labels):
                 if label_text in bold_labels:
                     tick.set_fontweight("bold")
@@ -109,11 +108,7 @@ def configure_axes(
         else:
             # Fallback to default behavior if no node labels provided
             current_yticks = ax.get_yticks()
-            interval = (
-                current_yticks[1] - current_yticks[0]
-                if len(current_yticks) > 1
-                else 1.0
-            )
+            interval = current_yticks[1] - current_yticks[0] if len(current_yticks) > 1 else 1.0
             new_yticks = [x + interval / 2 for x in current_yticks]
             ax.set_yticks(new_yticks)
             ax.set_yticklabels([])

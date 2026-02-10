@@ -121,7 +121,7 @@ def manual_partition():
 
 
 def parameter_sensitivity():
-    """Show how alpha and omega affect modularity."""
+    """Show how gamma and omega affect modularity."""
     print("\n" + "=" * 60)
     print("4. PARAMETER SENSITIVITY")
     print("=" * 60)
@@ -131,9 +131,9 @@ def parameter_sensitivity():
 
     print("\nAlpha (resolution) effect:")
     print("-" * 40)
-    for alpha in [0.0, 0.5, 1.0, 2.0]:
-        result = longitudinal_modularity(ls, communities, alpha=alpha)
-        print(f"  alpha={alpha}: modularity={result.value:.4f}")
+    for gamma in [0.0, 0.5, 1.0, 2.0]:
+        result = longitudinal_modularity(ls, communities, gamma=alpha)
+        print(f"  gamma={alpha}: modularity={result.value:.4f}")
 
     print("\nOmega (time smoothness) effect:")
     print("-" * 40)
@@ -152,13 +152,13 @@ def understanding_components():
     communities = lago_modules(ls)
 
     # Full modularity
-    full = longitudinal_modularity(ls, communities, alpha=1.0, omega=2.0)
+    full = longitudinal_modularity(ls, communities, gamma=1.0, omega=2.0)
 
     # Without expectation term
-    no_expect = longitudinal_modularity(ls, communities, alpha=0.0, omega=2.0)
+    no_expect = longitudinal_modularity(ls, communities, gamma=0.0, omega=2.0)
 
     # Without time penalty
-    no_time = longitudinal_modularity(ls, communities, alpha=1.0, omega=0.0)
+    no_time = longitudinal_modularity(ls, communities, gamma=1.0, omega=0.0)
 
     print("\nModularity breakdown:")
     print("-" * 40)

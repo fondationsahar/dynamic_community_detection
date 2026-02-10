@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 from lago.core.enums import LexType
 from lago.core.time_modules import TimeModules
 from lago.core.utils import (
-    get_module_duration,
-    get_nodes_durations,
-    get_nodes_times,
+    get_module_duration_from_members,
+    get_nodes_durations_from_members,
+    get_nodes_times_from_members,
 )
 
 if TYPE_CHECKING:
@@ -31,13 +31,13 @@ class ModularityResult:
     Attributes:
         value: The total modularity value (including time penalty).
         time_penalty: The time penalty term.
-        lex_type: The expectation type used for computation.
+        lex: The expectation type used for computation.
         ndigits: Number of decimal places used for rounding.
     """
 
     value: float
     time_penalty: float
-    lex_type: LexType
+    lex: LexType
     ndigits: int = 5
 
     @property
@@ -97,10 +97,11 @@ class _DegreeCache:
         ls = self._linkstream
 
         if ls.directed:
-            return multiplier * (
-                ls.degrees_in.get(source, 0) * ls.degrees_out.get(target, 0)
-                + ls.degrees_out.get(source, 0) * ls.degrees_in.get(target, 0)
-            )
+            if source == target:
+                return ls.degrees_out.get(source, 0) * ls.degrees_in.get(target, 0)
+            return ls.degrees_out.get(source, 0) * ls.degrees_in.get(
+                target, 0
+            ) + ls.degrees_out.get(target, 0) * ls.degrees_in.get(source, 0)
 
         return multiplier * ls.degrees.get(source, 0) * ls.degrees.get(target, 0)
 
@@ -115,6 +116,7 @@ def _compute_expected_value(
     time_factor: float,
     network_duration: int,
     total_weight: float,
+    directed: bool,
 ) -> float:
     """Compute expected value from degree contribution and time factor.
 
@@ -127,36 +129,39 @@ def _compute_expected_value(
     Returns:
         The expected value for this node pair.
     """
-    return degrees_contribution * (time_factor / network_duration) / (2 * total_weight) ** 2
+    denom_direct_factor = 2 ** (not directed)
+
+    return (
+        degrees_contribution
+        / (denom_direct_factor * total_weight) ** 2
+        * (time_factor / network_duration)
+    )
 
 
-def _validate_lex_type(lex_type: LexType | str) -> LexType:
-    """Validate and convert lex_type to LexType enum.
+def _validate_lex(lex: LexType | str) -> LexType:
+    """Validate and convert lex to LexType enum.
 
     Args:
-        lex_type: LexType enum or string ('CM', 'JM', 'MM').
+        lex: LexType enum or string ('CM', 'JM', 'MM').
 
     Returns:
         LexType enum value.
 
     Raises:
-        ValueError: If lex_type string is invalid.
-        TypeError: If lex_type is not a LexType enum or string.
+        ValueError: If lex string is invalid.
+        TypeError: If lex is not a LexType enum or string.
     """
-    if isinstance(lex_type, LexType):
-        return lex_type
+    if isinstance(lex, LexType):
+        return lex
 
-    if isinstance(lex_type, str):
-        lex_str = lex_type.upper()
+    if isinstance(lex, str):
+        lex_str = lex.upper()
         if lex_str not in ("CM", "JM", "MM"):
-            msg = f'Invalid lex_type string "{lex_type}". Must be "CM", "JM", or "MM".'
+            msg = f'Invalid lex string "{lex}". Must be "CM", "JM", or "MM".'
             raise ValueError(msg)
         return LexType[lex_str]
 
-    msg = (
-        f"lex_type must be a LexType enum or string ('CM', 'JM', 'MM'), "
-        f"got {type(lex_type).__name__}"
-    )
+    msg = f"lex must be a LexType enum or string ('CM', 'JM', 'MM'), got {type(lex).__name__}"
     raise TypeError(msg)
 
 
@@ -169,7 +174,7 @@ def longitudinal_modularity(
     linkstream: LinkStream,
     communities: dict[CommunityLabel, set[tuple[int, int]]] | TimeModules,
     lex: LexType | str = LexType.MM,
-    alpha: float = 1.0,
+    gamma: float = 1.0,
     omega: float = 2.0,
     ndigits: int = 5,
 ) -> ModularityResult:
@@ -185,7 +190,7 @@ def longitudinal_modularity(
             - JM (Joint-Membership): uses community duration.
             - MM (Mean-Membership): uses geometric mean of node durations.
             Defaults to LexType.MM.
-        alpha: Weight for expectation term. Default 1.0.
+        gamma: Weight for expectation term. Default 1.0.
         omega: Weight for time penalty term. Default 2.0.
         ndigits: Number of decimal places for rounding. Default 5.
 
@@ -220,8 +225,7 @@ def longitudinal_modularity(
         ```
     """
     # Validate and normalize lex
-    lex = _validate_lex_type(lex)
-
+    lex = _validate_lex(lex)
     # Handle TimeModules input - use its pre-computed structures
     if isinstance(communities, TimeModules):
         labels = communities.to_flat_labels()
@@ -237,26 +241,19 @@ def longitudinal_modularity(
     else:
         # Build labels dict and communities data structures from raw dict
         labels: LabelsDict = {}
-        communities_leaves: dict[CommunityLabel, set[Leaf]] = {}
         communities_nodes: dict[CommunityLabel, set[int]] = {}
         communities_dict = communities
 
         for label, members in communities.items():
-            communities_leaves[label] = set()
             communities_nodes[label] = set()
-            for leaf_key in members:
-                if leaf_key not in linkstream.leaves_dict:
-                    continue
-                leaf = linkstream.leaves_dict[leaf_key]
-                communities_leaves[label].add(leaf)
-                communities_nodes[label].add(leaf.node)
-                labels[leaf_key] = label
-
+            for node, time in members:
+                communities_nodes[label].add(node)
+                labels[(node, time)] = label
     # 1 - Count intra-community interactions
     communities_nb_interactions = _count_intra_community_interactions(linkstream, labels)
 
-    # 2 - Compute expectations (LAZY: skip if alpha == 0)
-    if alpha == 0:
+    # 2 - Compute expectations (LAZY: skip if gamma == 0)
+    if gamma == 0:
         communities_expectations: dict[CommunityLabel, float] = dict.fromkeys(communities, 0.0)
     else:
         # Create degree cache for performance
@@ -268,7 +265,7 @@ def longitudinal_modularity(
             LexType.MM: _compute_mean_expectations,
         }
         communities_expectations = expectation_functions[lex](
-            linkstream, communities_leaves, communities_nodes, degree_cache
+            linkstream, communities_dict, communities_nodes, degree_cache
         )
 
     # 3 - Time penalty (LAZY: skip if omega == 0)
@@ -282,14 +279,14 @@ def longitudinal_modularity(
     lm_modularity = 0.0
     for community, expectation in communities_expectations.items():
         nb_links = communities_nb_interactions.get(community, 0)
-        lm_modularity += nb_links / (2 * linkstream.weight) - alpha * expectation
+        lm_modularity += nb_links / (2 * linkstream.weight) - gamma * expectation
 
     lm_modularity += time_penalty
 
     return ModularityResult(
-        value=round(lm_modularity, ndigits=ndigits),
-        time_penalty=round(time_penalty, ndigits=ndigits),
-        lex_type=lex,
+        value=float(round(lm_modularity, ndigits=ndigits)),
+        time_penalty=float(round(time_penalty, ndigits=ndigits)),
+        lex=lex,
         ndigits=ndigits,
     )
 
@@ -318,7 +315,6 @@ def _count_intra_community_interactions(
         community = labels.get((node, time))
         if community is None:
             continue
-
         if community not in communities_nb_interactions:
             communities_nb_interactions[community] = 0
 
@@ -336,7 +332,7 @@ def _count_intra_community_interactions(
 
 def _compute_joint_expectations(
     linkstream: LinkStream,
-    communities_leaves: dict[CommunityLabel, set[Leaf]],
+    communities_members: dict[CommunityLabel, set[tuple[int, int]]],
     communities_nodes: dict[CommunityLabel, set[int]],
     degree_cache: _DegreeCache,
 ) -> dict[CommunityLabel, float]:
@@ -346,7 +342,7 @@ def _compute_joint_expectations(
 
     Args:
         linkstream: The temporal network.
-        communities_leaves: Mapping from community label to set of Leaf objects.
+        communities_members: Mapping from community label to set of (node, time) tuples.
         communities_nodes: Pre-computed mapping from community label to node IDs.
         degree_cache: Cache for degree contribution lookups.
 
@@ -355,10 +351,10 @@ def _compute_joint_expectations(
     """
     communities_expectations: dict[CommunityLabel, float] = {}
 
-    for community, leaves in communities_leaves.items():
+    for community, members in communities_members.items():
         expectation = 0.0
         community_nodes = communities_nodes[community]
-        community_duration = get_module_duration(leaves)
+        community_duration = get_module_duration_from_members(members)
 
         for source, target in combinations_with_replacement(community_nodes, 2):
             degrees_part = degree_cache.get_contribution(source, target)
@@ -367,6 +363,7 @@ def _compute_joint_expectations(
                 community_duration,
                 linkstream.network_duration,
                 linkstream.weight,
+                linkstream.directed,
             )
             expectation += expected_value
 
@@ -377,7 +374,7 @@ def _compute_joint_expectations(
 
 def _compute_mean_expectations(
     linkstream: LinkStream,
-    communities_leaves: dict[CommunityLabel, set[Leaf]],
+    communities_members: dict[CommunityLabel, set[tuple[int, int]]],
     communities_nodes: dict[CommunityLabel, set[int]],
     degree_cache: _DegreeCache,
 ) -> dict[CommunityLabel, float]:
@@ -387,7 +384,7 @@ def _compute_mean_expectations(
 
     Args:
         linkstream: The temporal network.
-        communities_leaves: Mapping from community label to set of Leaf objects.
+        communities_members: Mapping from community label to set of (node, time) tuples.
         communities_nodes: Pre-computed mapping from community label to node IDs.
         degree_cache: Cache for degree contribution lookups.
 
@@ -396,20 +393,20 @@ def _compute_mean_expectations(
     """
     communities_expectations: dict[CommunityLabel, float] = {}
 
-    for community, leaves in communities_leaves.items():
+    for community, members in communities_members.items():
         expectation = 0.0
-        nodes_durations = get_nodes_durations(module_leaves=leaves)
+        nodes_durations = get_nodes_durations_from_members(members)
         community_nodes = communities_nodes[community]
 
         for source, target in combinations_with_replacement(community_nodes, 2):
             geo_mean = (nodes_durations.get(source, 0) * nodes_durations.get(target, 0)) ** 0.5
-
             degrees_part = degree_cache.get_contribution(source, target)
             expected_value = _compute_expected_value(
                 degrees_part,
                 geo_mean,
                 linkstream.network_duration,
                 linkstream.weight,
+                linkstream.directed,
             )
             expectation += expected_value
 
@@ -420,7 +417,7 @@ def _compute_mean_expectations(
 
 def _compute_coexistence_expectations(
     linkstream: LinkStream,
-    communities_leaves: dict[CommunityLabel, set[Leaf]],
+    communities_members: dict[CommunityLabel, set[tuple[int, int]]],
     communities_nodes: dict[CommunityLabel, set[int]],
     degree_cache: _DegreeCache,
 ) -> dict[CommunityLabel, float]:
@@ -430,7 +427,7 @@ def _compute_coexistence_expectations(
 
     Args:
         linkstream: The temporal network.
-        communities_leaves: Mapping from community label to set of Leaf objects.
+        communities_members: Mapping from community label to set of (node, time) tuples.
         communities_nodes: Pre-computed mapping from community label to node IDs.
         degree_cache: Cache for degree contribution lookups.
 
@@ -439,16 +436,16 @@ def _compute_coexistence_expectations(
     """
     communities_expectations: dict[CommunityLabel, float] = {}
 
-    for community, leaves in communities_leaves.items():
+    for community, members in communities_members.items():
         expectation = 0.0
         community_nodes_sorted = sorted(communities_nodes[community])
-        nodes_times = get_nodes_times(leaves)
+        nodes_times = get_nodes_times_from_members(members)
 
         for idx, source in enumerate(community_nodes_sorted):
-            source_times = nodes_times[source]
+            source_times = nodes_times.get(source, set())
 
             for target in community_nodes_sorted[idx:]:
-                target_times = nodes_times[target]
+                target_times = nodes_times.get(target, set())
                 coexistence = len(source_times & target_times)
 
                 if not coexistence:
@@ -460,6 +457,7 @@ def _compute_coexistence_expectations(
                     coexistence,
                     linkstream.network_duration,
                     linkstream.weight,
+                    linkstream.directed,
                 )
                 expectation += expected_value
 

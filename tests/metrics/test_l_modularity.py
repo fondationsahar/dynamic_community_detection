@@ -170,7 +170,7 @@ class TestExpectationTypes:
 
 
 # =============================================================================
-# SECTION 3: Parameter Tests (alpha, omega, ndigits)
+# SECTION 3: Parameter Tests (gamma, omega, ndigits)
 # =============================================================================
 
 
@@ -198,15 +198,15 @@ class TestParameters:
         }
         return ls, communities
 
-    def test_alpha_affects_result(self, basic_setup) -> None:
-        """Test that alpha parameter affects the result."""
+    def test_gamma_affects_result(self, basic_setup) -> None:
+        """Test that gamma parameter affects the result."""
         ls, communities = basic_setup
 
-        result_alpha_1 = longitudinal_modularity(ls, communities, alpha=1.0)
-        result_alpha_2 = longitudinal_modularity(ls, communities, alpha=2.0)
+        result_gamma_1 = longitudinal_modularity(ls, communities, gamma=1.0)
+        result_gamma_2 = longitudinal_modularity(ls, communities, gamma=2.0)
 
         # Different alpha should give different results
-        assert result_alpha_1.value != result_alpha_2.value
+        assert result_gamma_1.value != result_gamma_2.value
 
     def test_omega_affects_time_penalty(self, basic_setup) -> None:
         """Test that omega parameter affects the time penalty."""
@@ -545,3 +545,157 @@ class TestIntegration:
 
         result = longitudinal_modularity(ls, communities)
         assert isinstance(result, ModularityResult)
+
+
+# =============================================================================
+# SECTION 10: Specific Modularity Value Tests
+# =============================================================================
+
+
+class TestSpecificModularityValues:
+    """Tests for specific expected modularity values."""
+
+    @pytest.fixture
+    def cycle_links(self):
+        """Create a cycle graph links structure."""
+        return [
+            [0, 1, 0],
+            [0, 2, 0],
+            [1, 2, 0],
+            [2, 3, 0],
+            [3, 0, 0],
+        ]
+
+    def test_directed_two_modules_jm_and_mm(self, cycle_links) -> None:
+        """Test directed graph with two modules using JM and MM expectations."""
+        ls = LinkStream(directed=True)
+        ls.add_links(cycle_links)
+
+        modules = {
+            0: {(0, 0), (1, 0)},
+            1: {(2, 0), (3, 0)},
+        }
+
+        # Test with JM expectation
+        result_jm = longitudinal_modularity(
+            ls, modules, lex=LexType.JM, omega=0, gamma=1
+        )
+        assert result_jm.value == -0.08
+
+        # Test with MM expectation (should give same result)
+        result_mm = longitudinal_modularity(
+            ls, modules, lex=LexType.MM, omega=0, gamma=1
+        )
+        assert result_mm.value == -0.08
+
+    def test_directed_single_module_jm_and_mm(self, cycle_links) -> None:
+        """Test directed graph with all nodes in one module using JM and MM."""
+        ls = LinkStream(directed=True)
+        ls.add_links(cycle_links)
+
+        modules = {
+            0: {(0, 0), (1, 0), (2, 0), (3, 0)},
+        }
+
+        # Test with JM expectation
+        result_jm = longitudinal_modularity(
+            ls, modules, lex=LexType.JM, omega=0, gamma=1
+        )
+        assert result_jm.value == 0
+
+        # Test with MM expectation (should give same result)
+        result_mm = longitudinal_modularity(
+            ls, modules, lex=LexType.MM, omega=0, gamma=1
+        )
+        assert result_mm.value == 0
+
+    def test_directed_singleton_modules_jm_and_mm(self, cycle_links) -> None:
+        """Test directed graph with each node in separate module using JM and MM."""
+        ls = LinkStream(directed=True)
+        ls.add_links(cycle_links)
+
+        modules = {
+            0: {(0, 0)},
+            1: {(1, 0)},
+            2: {(2, 0)},
+            3: {(3, 0)},
+        }
+
+        # Test with JM expectation
+        result_jm = longitudinal_modularity(
+            ls, modules, lex=LexType.JM, omega=0, gamma=1
+        )
+        assert result_jm.value == -0.24
+
+        # Test with MM expectation (should give same result)
+        result_mm = longitudinal_modularity(
+            ls, modules, lex=LexType.MM, omega=0, gamma=1
+        )
+        assert result_mm.value == -0.24
+
+    def test_undirected_two_modules_jm_and_mm(self, cycle_links) -> None:
+        """Test undirected graph with two modules using JM and MM expectations."""
+        ls = LinkStream()
+        ls.add_links(cycle_links)
+
+        modules = {
+            0: {(0, 0), (1, 0)},
+            1: {(2, 0), (3, 0)},
+        }
+
+        # Test with JM expectation
+        result_jm = longitudinal_modularity(
+            ls, modules, lex=LexType.JM, omega=0, gamma=1
+        )
+        assert result_jm.value == -0.1
+
+        # Test with MM expectation (should give same result)
+        result_mm = longitudinal_modularity(
+            ls, modules, lex=LexType.MM, omega=0, gamma=1
+        )
+        assert result_mm.value == -0.1
+
+    def test_undirected_single_module_jm_and_mm(self, cycle_links) -> None:
+        """Test undirected graph with all nodes in one module using JM and MM."""
+        ls = LinkStream()
+        ls.add_links(cycle_links)
+
+        modules = {
+            0: {(0, 0), (1, 0), (2, 0), (3, 0)},
+        }
+
+        # Test with JM expectation
+        result_jm = longitudinal_modularity(
+            ls, modules, lex=LexType.JM, omega=0, gamma=1
+        )
+        assert result_jm.value == 0
+
+        # Test with MM expectation (should give same result)
+        result_mm = longitudinal_modularity(
+            ls, modules, lex=LexType.MM, omega=0, gamma=1
+        )
+        assert result_mm.value == 0
+
+    def test_undirected_singleton_modules_jm_and_mm(self, cycle_links) -> None:
+        """Test undirected graph with each node in separate module using JM and MM."""
+        ls = LinkStream()
+        ls.add_links(cycle_links)
+
+        modules = {
+            0: {(0, 0)},
+            1: {(1, 0)},
+            2: {(2, 0)},
+            3: {(3, 0)},
+        }
+
+        # Test with JM expectation
+        result_jm = longitudinal_modularity(
+            ls, modules, lex=LexType.JM, omega=0, gamma=1
+        )
+        assert result_jm.value == -0.26
+
+        # Test with MM expectation (should give same result)
+        result_mm = longitudinal_modularity(
+            ls, modules, lex=LexType.MM, omega=0, gamma=1
+        )
+        assert result_mm.value == -0.26

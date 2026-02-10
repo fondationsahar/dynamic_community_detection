@@ -24,7 +24,7 @@ lago_modules(
     linkstream: LinkStream,
     lex: LexType | str = LexType.MM,
     nb_iter: int = 1,
-    alpha: float = 1,
+    gamma: float = 1,
     omega: float = 2,
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
@@ -42,7 +42,7 @@ lago_modules(
 | `linkstream` | `LinkStream` | *required* | The temporal network to analyze |
 | `lex` | `LexType \| str` | `"MM"` | Longitudinal expectation type: `"MM"`, `"JM"`, or `LexType.MM`, `LexType.JM` |
 | `nb_iter` | `int` | `1` | Number of algorithm runs (best result kept) |
-| `alpha` | `float` | `1` | Resolution parameter (higher = smaller communities) |
+| `gamma` | `float` | `1` | Resolution parameter (higher = smaller communities) |
 | `omega` | `float` | `2` | Temporal smoothness (higher = less community switching) |
 | `refinement` | `str \| None` | `"STEM"` | Refinement strategy: `None`, `"STNM"`, or `"STEM"` |
 | `fast_exploration` | `bool` | `True` | Use fast exploration (faster but may find lower quality) |
@@ -82,7 +82,7 @@ communities = lago_modules(ls)
 communities = lago_modules(
     ls,
     lex="MM",
-    alpha=1.5,    # Smaller communities
+    gamma=1.5,    # Smaller communities
     omega=3,      # More temporal stability
     nb_iter=3,    # Run 3 times, keep best
 )
@@ -106,7 +106,7 @@ longitudinal_modularity(
     linkstream: LinkStream,
     communities: dict[CommunityLabel, set[tuple[int, int]]] | TimeModules,
     lex: LexType | str = LexType.MM,
-    alpha: float = 1.0,
+    gamma: float = 1.0,
     omega: float = 2.0,
     ndigits: int = 5,
 ) -> ModularityResult
@@ -119,7 +119,7 @@ longitudinal_modularity(
 | `linkstream` | `LinkStream` | *required* | The temporal network |
 | `communities` | `dict \| TimeModules` | *required* | Community partition to evaluate |
 | `lex` | `LexType \| str` | `"MM"` | Expectation type: `"CM"`, `"JM"`, `"MM"` |
-| `alpha` | `float` | `1.0` | Weight for expectation term |
+| `gamma` | `float` | `1.0` | Weight for expectation term |
 | `omega` | `float` | `2.0` | Weight for time penalty |
 | `ndigits` | `int` | `5` | Decimal places for rounding |
 
@@ -423,6 +423,47 @@ plot.configure_display(
     show_xlabel: bool = True,
     show_ylabel: bool = True,
     show_yticks: bool = True,
+)
+```
+
+#### set_xlabel_style()
+
+Customize the X-axis label appearance and position.
+
+```python
+plot.set_xlabel_style(
+    text: str = "Time",              # Label text
+    fontsize: int | None = None,     # Font size (None = use label_font_size)
+    fontweight: str = "bold",        # 'normal', 'bold', 'light', 'semibold'
+    coords: tuple = (0.0, 0.025),    # Position in axes fraction
+    rotation: float = 0.0,           # Rotation angle in degrees
+    ha: str = "left",                # Horizontal alignment
+)
+```
+
+#### set_ylabel_style()
+
+Customize the Y-axis label appearance and position.
+
+```python
+plot.set_ylabel_style(
+    text: str = "Nodes",             # Label text
+    fontsize: int | None = None,     # Font size (None = use label_font_size)
+    fontweight: str = "bold",        # 'normal', 'bold', 'light', 'semibold'
+    coords: tuple = (-0.05, 1.0),    # Position in axes fraction
+    rotation: float = 90.0,          # Rotation angle in degrees
+    ha: str = "right",               # Horizontal alignment
+)
+```
+
+#### set_margins()
+
+Set the axis margins.
+
+```python
+plot.set_margins(
+    x: float = 0.02,    # X-axis margin (fraction of data range)
+    y: float = 0.05,    # Y-axis margin (fraction of data range)
 )
 ```
 

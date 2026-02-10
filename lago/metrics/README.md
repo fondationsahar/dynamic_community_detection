@@ -18,7 +18,7 @@ ls = LinkStream()
 ls.add_links([(0, 1, 0), (1, 2, 1)])
 modules = ...  # From lago_modules() or manual construction
 
-result = longitudinal_modularity(ls, modules, lex_type=LexType.MM)
+result = longitudinal_modularity(ls, modules, lex=LexType.MM)
 print(f"Modularity: {result.value}")
 print(f"Time penalty: {result.time_penalty}")
 
@@ -32,8 +32,8 @@ from lago.metrics import longitudinal_modularity, ModularityResult
 def longitudinal_modularity(
     linkstream: LinkStream,
     time_modules: TimeModules,
-    lex_type: LexType | str = LexType.MM,
-    alpha: float = 1,
+    lex: LexType | str = LexType.MM,
+    gamma: float = 1,
     omega: float = 2,
 ) -> ModularityResult
 ```
@@ -42,11 +42,11 @@ def longitudinal_modularity(
 
 - **linkstream**: The temporal network
 - **time_modules**: Detected temporal modules
-- **lex_type**: Longitudinal Expectation type:
+- **lex**: Longitudinal Expectation type:
   - `LexType.JM`: Joint-Membership
   - `LexType.MM`: Mean-Membership
   - `LexType.CM`: Coexistence (only for modularity, not for detection)
-- **alpha**: Topological resolution parameter
+- **gamma**: Topological resolution parameter
 - **omega**: Temporal resolution parameter
 
 ### Returns

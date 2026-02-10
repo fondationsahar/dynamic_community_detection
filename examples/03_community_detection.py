@@ -126,10 +126,10 @@ def parameter_comparison():
         print(f"  omega={omega}: {communities.nb_modules} communities")
 
     # Different alpha values (resolution)
-    print("\nEffect of alpha (resolution):")
-    for alpha in [0.5, 1, 2]:
-        communities = lago_modules(ls, alpha=alpha)
-        print(f"  alpha={alpha}: {communities.nb_modules} communities")
+    print("\nEffect of gamma (resolution):")
+    for gamma in [0.5, 1, 2]:
+        communities = lago_modules(ls, gamma=alpha)
+        print(f"  gamma={alpha}: {communities.nb_modules} communities")
 
     # Different lex types
     print("\nEffect of lex (expectation type):")

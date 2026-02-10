@@ -102,7 +102,7 @@ communities.to_json("results.json")
 |-----------|---------|-------------|
 | `lex` | `"MM"` | Expectation type: `"MM"` (flexible) or `"JM"` (stable communities) |
 | `omega` | `2` | Temporal smoothness (higher = fewer community switches) |
-| `alpha` | `1` | Resolution (higher = smaller communities) |
+| `gamma` | `1` | Resolution (higher = smaller communities) |
 | `refinement` | `"STEM"` | Refinement strategy: `None`, `"STNM"`, or `"STEM"` |
 | `nb_iter` | `1` | Number of runs (keeps best result) |
 
@@ -112,7 +112,7 @@ communities.to_json("results.json")
 |-----------|---------|-------------|
 | `lex` | `"MM"` | Expectation type: `"MM"`, `"JM"`, or `"CM"` |
 | `omega` | `2.0` | Weight for temporal penalty |
-| `alpha` | `1.0` | Weight for expectation term |
+| `gamma` | `1.0` | Weight for expectation term |
 
 ## Documentation
 

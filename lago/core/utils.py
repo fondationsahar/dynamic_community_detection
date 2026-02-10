@@ -63,6 +63,8 @@ def get_module_duration(module_leaves: set[Leaf]) -> float:
     all_times = list(all_times)
     if not all_times:
         return 0
+
+    # Approximation allowed for LAGO, no resurgences expected
     duration: float = np.max(all_times) - np.min(all_times) + 1
 
     return duration
@@ -140,6 +142,56 @@ def get_nodes_durations(module_leaves: set[Leaf]) -> dict[int, float]:
         nodes_durations[left_leaf.node] += right_leaf.time - left_leaf.time + right_duration
 
     return nodes_durations
+
+
+# ===========================================================================
+# Module Member Utilities (work directly with (node, time) tuples)
+# ===========================================================================
+
+
+def get_module_duration_from_members(members: set[tuple[int, int]]) -> int:
+    """Compute the duration of a module from its members.
+
+    Args:
+        members: Set of (node, time) tuples representing module membership.
+
+    Returns:
+        Duration of the module (max_time - min_time + 1).
+    """
+    if not members:
+        return 0
+    times = {time for _, time in members}
+    return len(times)
+
+
+def get_nodes_times_from_members(members: set[tuple[int, int]]) -> dict[int, set[int]]:
+    """Compute the times when each node belongs to the module from members.
+
+    Args:
+        members: Set of (node, time) tuples representing module membership.
+
+    Returns:
+        Dictionary mapping node ID to set of time points.
+    """
+    nodes_times: dict[int, set[int]] = {}
+    for node, time in members:
+        if node not in nodes_times:
+            nodes_times[node] = set()
+        nodes_times[node].add(time)
+    return nodes_times
+
+
+def get_nodes_durations_from_members(members: set[tuple[int, int]]) -> dict[int, int]:
+    """Compute how long each node belongs to the module from members.
+
+    Args:
+        members: Set of (node, time) tuples representing module membership.
+
+    Returns:
+        Dictionary mapping node ID to duration (number of time points).
+    """
+    nodes_times = get_nodes_times_from_members(members)
+    return {node: len(times) for node, times in nodes_times.items()}
 
 
 def get_expanded_module(backbone_leaves: set[Leaf]) -> set[tuple[int, int]]:

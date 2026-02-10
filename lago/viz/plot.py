@@ -44,19 +44,19 @@ from .data_preparation import (
     prepare_modules_for_display,
 )
 from .drawing import (
-    draw_module_periods,
     draw_edge_activity,
     draw_edge_activity_delayed,
     draw_edges,
     draw_edges_delayed,
     draw_focus_highlights,
+    draw_module_periods,
     draw_night_highlights,
     draw_nodes,
 )
 from .types import (
     ColorMapping,
-    Modules,
     ModuleNodesSegments,
+    Modules,
     NodeFocus,
     NodeId,
     NodesMapping,
@@ -171,10 +171,8 @@ class LongitudinalModulesPlot:
         self.edge_flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR
         self.height_module_color: float = DEFAULT_COMMUNITY_HEIGHT
         self.weight_scale: float = DEFAULT_WEIGHT_SCALE
-        self.edge_width_scale: float = 0.3  # Scale 0-1: edge thickness relative to time unit
-        self.edge_curve_intensity: float = (
-            0.0  # For delayed edges: curve intensity (positive=right, negative=left)
-        )
+        self.edge_linewidth: float = 1.0  # Edge line width in points
+        self.edge_curve_intensity: float = 0.0  # Curve intensity (positive=right, negative=left)
         self.show_edge_orientation: bool = False
         self.color_palette: str | Sequence[Any] = "tab10"
 
@@ -192,6 +190,24 @@ class LongitudinalModulesPlot:
         # Axis margin settings
         self.y_padding_bottom: float = 0.0  # Padding at bottom of y-axis (in node units)
         self.y_padding_top: float = 0.0  # Padding at top of y-axis (in node units)
+        self.x_margin: float = 0.02  # X-axis margin
+        self.y_margin: float = 0.05  # Y-axis margin
+
+        # X-axis label customization
+        self.xlabel_text: str = "Time"
+        self.xlabel_fontsize: int | None = None  # None means use label_font_size
+        self.xlabel_fontweight: str = "bold"
+        self.xlabel_coords: tuple[float, float] = (0.0, 0.025)
+        self.xlabel_rotation: float = 0.0
+        self.xlabel_ha: str = "left"  # horizontal alignment
+
+        # Y-axis label customization
+        self.ylabel_text: str = "Nodes"
+        self.ylabel_fontsize: int | None = None  # None means use label_font_size
+        self.ylabel_fontweight: str = "bold"
+        self.ylabel_coords: tuple[float, float] = (-0.05, 1.0)
+        self.ylabel_rotation: float = 90.0
+        self.ylabel_ha: str = "right"  # horizontal alignment
 
         # Node line style
         self.node_linewidth: float = 0.25  # Line width for regular nodes
@@ -442,9 +458,7 @@ class LongitudinalModulesPlot:
             >>> plot.set_modules(tm)
         """
         # Store original TimeModules object for efficient access to node segments
-        self._original_time_modules = (
-            modules if hasattr(modules, "get_time_modules_dict") else None
-        )
+        self._original_time_modules = modules if hasattr(modules, "get_time_modules_dict") else None
         self.modules = _convert_time_modules_to_modules(modules)
         self.max_shown_modules = max_shown
         self.hide_self_modules = hide_self
@@ -644,8 +658,7 @@ class LongitudinalModulesPlot:
         flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR,
         color: bool = False,
         orientation: bool = False,
-        weight_scale: float = DEFAULT_WEIGHT_SCALE,
-        width_scale: float | None = None,
+        linewidth: float | None = None,
         curve_intensity: float | None = None,
     ) -> "LongitudinalModulesPlot":
         """
@@ -653,47 +666,38 @@ class LongitudinalModulesPlot:
 
         Args:
             alpha: Edge transparency (0.0 to 1.0).
-            flatten_factor: Flattening factor for edge arcs.
+            flatten_factor: Flattening factor for edge arcs (higher = flatter).
             color: Whether to color edges by module.
             orientation: Whether to show edge orientation arrows for directed graphs.
-            weight_scale: Scale factor for edge weights.
-            width_scale: Scale for edge width (0.0 to 1.0). Controls how much of the
-                time unit width an edge fills. At 0, edges are invisible. At 1, consecutive
-                edges at t and t+1 touch with no gap between them. Default is 0.3.
-            curve_intensity: For delayed linkstreams, controls how much edges curve.
+            linewidth: Edge line width in points. Default 1.0.
+            curve_intensity: Controls how much edges curve.
                 0.0 = straight lines, positive values curve right, negative values curve left.
-                Typical values are between -0.3 and 0.3. Default is 0.0.
+                Typical values are between -0.5 and 0.5. Default is 0.0.
 
         Returns:
             Self for method chaining.
 
         Raises:
-            ValueError: If alpha or width_scale is not in range [0.0, 1.0].
+            ValueError: If alpha is not in range [0.0, 1.0].
 
         Example:
-            >>> # Make edges thicker (fill more of time unit)
-            >>> plot.set_edge_style(width_scale=0.8)
+            >>> # Thicker edges
+            >>> plot.set_edge_style(linewidth=2.0)
             >>>
-            >>> # Curve delayed edges slightly to the right
-            >>> plot.set_edge_style(curve_intensity=0.2)
+            >>> # Curved edges
+            >>> plot.set_edge_style(curve_intensity=0.3)
             >>>
-            >>> # Curve delayed edges more strongly to the right
-            >>> plot.set_edge_style(curve_intensity=0.5)
-            >>>
-            >>> # Curve delayed edges to the left
+            >>> # Curved to the left
             >>> plot.set_edge_style(curve_intensity=-0.2)
         """
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"alpha must be between 0.0 and 1.0, got {alpha}")
-        if width_scale is not None and not 0.0 <= width_scale <= 1.0:
-            raise ValueError(f"width_scale must be between 0.0 and 1.0, got {width_scale}")
         self.edge_alpha = alpha
         self.edge_flatten_factor = flatten_factor
         self.color_edges = color
         self.show_edge_orientation = orientation
-        self.weight_scale = weight_scale
-        if width_scale is not None:
-            self.edge_width_scale = width_scale
+        if linewidth is not None:
+            self.edge_linewidth = linewidth
         if curve_intensity is not None:
             self.edge_curve_intensity = curve_intensity
         return self
@@ -829,6 +833,113 @@ class LongitudinalModulesPlot:
             self.bold_labels = bold_labels
         return self
 
+    def set_xlabel_style(
+        self,
+        text: str = "Time",
+        fontsize: int | None = None,
+        fontweight: str = "bold",
+        coords: tuple[float, float] = (0.0, 0.025),
+        rotation: float = 0.0,
+        ha: str = "left",
+    ) -> "LongitudinalModulesPlot":
+        """
+        Customize the X-axis label appearance and position.
+
+        Args:
+            text: Label text. Default "Time".
+            fontsize: Font size. If None, uses label_font_size.
+            fontweight: Font weight ('normal', 'bold', 'light', 'semibold', etc.).
+            coords: Label position as (x, y) in axes fraction coordinates.
+                Default (0.0, 0.025) places it at the left, slightly below the axis.
+            rotation: Label rotation angle in degrees. Default 0.0.
+            ha: Horizontal alignment ('left', 'center', 'right'). Default 'left'.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Center the xlabel with larger font
+            >>> plot.set_xlabel_style(text="Time (hours)", fontsize=14, coords=(0.5, -0.05), ha="center")
+            >>>
+            >>> # Position at bottom left
+            >>> plot.set_xlabel_style(coords=(0.0, 0.025), ha="left")
+        """
+        self.xlabel_text = text
+        self.xlabel_fontsize = fontsize
+        self.xlabel_fontweight = fontweight
+        self.xlabel_coords = coords
+        self.xlabel_rotation = rotation
+        self.xlabel_ha = ha
+        return self
+
+    def set_ylabel_style(
+        self,
+        text: str = "Nodes",
+        fontsize: int | None = None,
+        fontweight: str = "bold",
+        coords: tuple[float, float] = (-0.05, 1.0),
+        rotation: float = 90.0,
+        ha: str = "right",
+    ) -> "LongitudinalModulesPlot":
+        """
+        Customize the Y-axis label appearance and position.
+
+        Args:
+            text: Label text. Default "Nodes".
+            fontsize: Font size. If None, uses label_font_size.
+            fontweight: Font weight ('normal', 'bold', 'light', 'semibold', etc.).
+            coords: Label position as (x, y) in axes fraction coordinates.
+                Default (-0.05, 1.0) places it at the top left of the plot.
+            rotation: Label rotation angle in degrees. Default 90.0.
+            ha: Horizontal alignment ('left', 'center', 'right'). Default 'right'.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Center the ylabel vertically with normal weight
+            >>> plot.set_ylabel_style(text="Accounts", fontweight="normal", coords=(-0.08, 0.5), ha="center")
+            >>>
+            >>> # Position at top with no rotation
+            >>> plot.set_ylabel_style(coords=(-0.05, 1.0), rotation=0, ha="right")
+        """
+        self.ylabel_text = text
+        self.ylabel_fontsize = fontsize
+        self.ylabel_fontweight = fontweight
+        self.ylabel_coords = coords
+        self.ylabel_rotation = rotation
+        self.ylabel_ha = ha
+        return self
+
+    def set_margins(
+        self,
+        x: float = 0.02,
+        y: float = 0.05,
+    ) -> "LongitudinalModulesPlot":
+        """
+        Set the axis margins.
+
+        Margins add padding around the data. A value of 0.05 means 5% of the
+        data range is added as padding on each side.
+
+        Args:
+            x: X-axis margin (fraction of data range). Default 0.02.
+            y: Y-axis margin (fraction of data range). Default 0.05.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> # Tight margins
+            >>> plot.set_margins(x=0.01, y=0.02)
+            >>>
+            >>> # More padding
+            >>> plot.set_margins(x=0.05, y=0.1)
+        """
+        self.x_margin = x
+        self.y_margin = y
+        return self
+
     def set_axis_padding(
         self,
         bottom: float = 0.0,
@@ -962,8 +1073,7 @@ class LongitudinalModulesPlot:
         edge_flatten_factor: float = DEFAULT_EDGE_FLATTEN_FACTOR,
         edge_color: bool = False,
         edge_orientation: bool = False,
-        edge_weight_scale: float = DEFAULT_WEIGHT_SCALE,
-        edge_width_scale: float = 0.3,
+        edge_linewidth: float = 1.0,
         edge_curve_intensity: float = 0.0,
         # Activity marker parameters
         activity_width: float = 0.8,
@@ -1028,8 +1138,7 @@ class LongitudinalModulesPlot:
             flatten_factor=edge_flatten_factor,
             color=edge_color,
             orientation=edge_orientation,
-            weight_scale=edge_weight_scale,
-            width_scale=edge_width_scale,
+            linewidth=edge_linewidth,
             curve_intensity=edge_curve_intensity,
         )
 
@@ -1538,9 +1647,7 @@ class LongitudinalModulesPlot:
             # Determine how many secondary slots we have
             if self.max_shown_modules > -1:
                 # max_shown includes both primary and secondary
-                secondary_slots = max(
-                    0, self.max_shown_modules - len(self._focused_modules)
-                )
+                secondary_slots = max(0, self.max_shown_modules - len(self._focused_modules))
             else:
                 # No limit - all remaining become secondary (colored but de-emphasized)
                 secondary_slots = len(remaining_sorted)
@@ -1623,9 +1730,7 @@ class LongitudinalModulesPlot:
         )
 
         # Create time-node to module mapping using remapped modules
-        self._time_node_module_mapping = create_time_node_module_mapping(
-            self._remapped_modules
-        )
+        self._time_node_module_mapping = create_time_node_module_mapping(self._remapped_modules)
 
         # Generate color mapping:
         # - Focused: full-color from palette (or explicit colors if provided)
@@ -1792,7 +1897,7 @@ class LongitudinalModulesPlot:
                         self.linkstream.directed,
                         self.linkstream.continuous,
                         self.linkstream,
-                        self.edge_width_scale,
+                        self.edge_linewidth,
                     )
 
     def _draw_edge_activity(self) -> None:
@@ -1866,6 +1971,23 @@ class LongitudinalModulesPlot:
                 num_nodes,
                 self.y_padding_bottom,
                 self.y_padding_top,
+                # X-axis label customization
+                xlabel_text=self.xlabel_text,
+                xlabel_fontsize=self.xlabel_fontsize,
+                xlabel_fontweight=self.xlabel_fontweight,
+                xlabel_coords=self.xlabel_coords,
+                xlabel_rotation=self.xlabel_rotation,
+                xlabel_ha=self.xlabel_ha,
+                # Y-axis label customization
+                ylabel_text=self.ylabel_text,
+                ylabel_fontsize=self.ylabel_fontsize,
+                ylabel_fontweight=self.ylabel_fontweight,
+                ylabel_coords=self.ylabel_coords,
+                ylabel_rotation=self.ylabel_rotation,
+                ylabel_ha=self.ylabel_ha,
+                # Margins
+                x_margin=self.x_margin,
+                y_margin=self.y_margin,
             )
 
     def _finalize_plot(self, title: str, show_plot: bool) -> None:

@@ -16,7 +16,7 @@ def lago_modules(
     linkstream: LinkStream,
     lex: LexType | str = LexType.MM,
     nb_iter: int = 1,
-    alpha: float = 1,
+    gamma: float = 1,
     omega: float = 2,
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
@@ -40,7 +40,7 @@ def lago_modules(
               evolution of modules.
             Defaults to LexType.MM.
         nb_iter: Number of LAGO runs. Best results are returned.
-        alpha: Resolution parameter. Must be >= 0. Higher values lead to smaller
+        gamma: Resolution parameter. Must be >= 0. Higher values lead to smaller
             modules topologically. Defaults to 1.
         omega: Time resolution parameter. Must be >= 0. Higher values lead to more
             smoothness in module changes. Defaults to 2.
@@ -137,7 +137,7 @@ def lago_modules(
         modularity, modules = lago_run(
             linkstream,
             lex_str,
-            alpha,
+            gamma,
             omega,
             refinement,
             fast_exploration,

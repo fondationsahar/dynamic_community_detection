@@ -338,7 +338,7 @@ def draw_edges(
     is_directed: bool = False,
     is_continuous: bool = False,
     linkstream=None,
-    width_scale: float = 0.3,
+    linewidth: float = 1.0,
 ):
     """
     Draw edges between nodes.
@@ -357,9 +357,7 @@ def draw_edges(
         is_directed: Whether the linkstream is directed
         is_continuous: Whether the linkstream has continuous time intervals
         linkstream: The linkstream object for accessing original edge directions
-        width_scale: Scale for edge width (0.0 to 1.0). Controls how much of the
-            time unit width an edge fills. At 0, edges are invisible. At 1, consecutive
-            edges at t and t+1 touch with no gap between them. Default is 0.3.
+        linewidth: Edge line width in points. Default 1.0.
     """
     for link in time_links:
         if is_continuous:
@@ -371,11 +369,6 @@ def draw_edges(
         else:
             # Regular linkstreams have: (source, target, time[, weight])
             source, target, time = link[0], link[1], link[2]
-            # Note: weight available as link[3] if needed for future linewidth scaling
-
-        # Apply width_scale to linewidth using capped calculation
-        # At width_scale=1.0, linewidth equals the capped max_linewidth
-        linewidth = 0.5  # weight * width_scale * max_linewidth
 
         node1, node2 = source, target
         if not is_directed:

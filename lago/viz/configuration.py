@@ -50,6 +50,23 @@ def configure_axes(
     num_nodes: int = 0,
     y_padding_bottom: float = 0.0,
     y_padding_top: float = 0.0,
+    # X-axis label customization
+    xlabel_text: str = "Time",
+    xlabel_fontsize: int | None = None,
+    xlabel_fontweight: str = "bold",
+    xlabel_coords: tuple[float, float] = (0.0, 0.025),
+    xlabel_rotation: float = 0.0,
+    xlabel_ha: str = "left",
+    # Y-axis label customization
+    ylabel_text: str = "Nodes",
+    ylabel_fontsize: int | None = None,
+    ylabel_fontweight: str = "bold",
+    ylabel_coords: tuple[float, float] = (-0.05, 1.0),
+    ylabel_rotation: float = 90.0,
+    ylabel_ha: str = "right",
+    # Margins
+    x_margin: float = 0.02,
+    y_margin: float = 0.05,
 ):
     """
     Configure axes labels, ticks, and appearance.
@@ -115,8 +132,9 @@ def configure_axes(
     else:
         ax.set_yticklabels([])
 
-    ax.margins(x=0.02)
-    ax.margins(y=0.05)
+    # Apply margins
+    ax.margins(x=x_margin)
+    ax.margins(y=y_margin)
 
     # Set explicit y-limits to prevent FancyArrowPatch curves from expanding bounds
     # This is especially important for delayed linkstreams with curved edges
@@ -125,17 +143,34 @@ def configure_axes(
         ax.set_ylim(-y_padding_bottom, num_nodes + y_padding_top)
 
     if display_xlabel:
-        ax.xaxis.set_label_coords(0, 0.025)
-        ax.set_xlabel("Time", fontsize=label_font_size, fontweight="bold")
+        ax.xaxis.set_label_coords(*xlabel_coords)
+        effective_xlabel_fontsize = (
+            xlabel_fontsize if xlabel_fontsize is not None else label_font_size
+        )
+        ax.set_xlabel(
+            xlabel_text,
+            fontsize=effective_xlabel_fontsize,
+            fontweight=xlabel_fontweight,
+            rotation=xlabel_rotation,
+            ha=xlabel_ha,
+        )
 
     if display_ylabel:
-        ax.margins(y=0.05)
         # Adjust y-axis label position to prevent overlap with tick labels
-        ax.yaxis.set_label_coords(-0.05, 1)  # Reduced from -0.1 to -0.05
-        ax.set_ylabel("Nodes", fontsize=label_font_size, fontweight="bold")
+        ax.yaxis.set_label_coords(*ylabel_coords)
+        effective_ylabel_fontsize = (
+            ylabel_fontsize if ylabel_fontsize is not None else label_font_size
+        )
+        ax.set_ylabel(
+            ylabel_text,
+            fontsize=effective_ylabel_fontsize,
+            fontweight=ylabel_fontweight,
+            rotation=ylabel_rotation,
+            ha=ylabel_ha,
+        )
         # Add extra left margin when displaying y-tick labels to prevent overlap
         if display_yticks_labels and node_labels:
-            ax.margins(x=0.01)  # Reduced from 0.15 to 0.10 for better balance
+            ax.margins(x=0.01)
 
     # Remove axes spines
     for spine_key in ax.spines:

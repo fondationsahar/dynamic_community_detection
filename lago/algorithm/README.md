@@ -30,7 +30,7 @@ def lago_modules(
     linkstream: LinkStream,
     lex_type: LexType | str = LexType.MM,
     nb_iter: int = 1,
-    alpha: float = 1,
+    gamma: float = 1,
     omega: float = 2,
     refinement: str | None = "STEM",
     fast_exploration: bool = True,
@@ -46,7 +46,7 @@ def lago_modules(
 - **linkstream**: Link Stream on which to find temporal modules
 - **lex_type**: Longitudinal Expectation type (`LexType.JM` or `LexType.MM`)
 - **nb_iter**: Number of LAGO runs (best results returned)
-- **alpha**: Topological resolution (higher = smaller modules)
+- **gamma**: Topological resolution (higher = smaller modules)
 - **omega**: Temporal resolution (higher = smoother transitions)
 - **refinement**: Strategy (`None`, `"STEM"`, or `"STNM"`)
 - **fast_exploration**: Enable fast exploration heuristic

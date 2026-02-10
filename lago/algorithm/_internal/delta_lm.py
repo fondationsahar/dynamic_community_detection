@@ -16,12 +16,12 @@ class DeltaLongitudinalModularityComputer:
         self,
         linkstream: LinkStream,
         lex: str = "JM",
-        alpha: float = 1,
+        gamma: float = 1,
         omega: float = 2,
     ):
         self.linkstream = linkstream
         self.lex = lex
-        self.alpha = alpha
+        self.gamma = gamma
         self.omega = omega
 
     def M0_to_Mx(
@@ -46,7 +46,11 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: Δ L-Modularity of the movement
         """
+
         weight_diff = self._get_weight_diff(M0_leaves, Mx_leaves)
+
+        if self.linkstream.directed:
+            weight_diff *= 2
 
         if self.lex == "MM":
             expectation_diff = self._get_expectation_mm_part(
@@ -64,11 +68,22 @@ class DeltaLongitudinalModularityComputer:
         else:
             raise Exception("Wrong lex value")
 
-        # TODO Ensure _get_csc_diff is compatible with the continuous setting
-        # Deal with time edge durations if necessary.
         csc_diff = self._get_csc_diff(M0_time_segments, Mx_leaves)
 
-        delta_lm = weight_diff - self.alpha * expectation_diff + self.omega * csc_diff
+        delta_lm = weight_diff - self.gamma * expectation_diff + self.omega * csc_diff
+
+        print(
+            "weight_diff:",
+            weight_diff,
+            "| expectation_diff:",
+            expectation_diff,
+            " | csc_diff:",
+            csc_diff,
+            "self.gamma:",
+            self.gamma,
+            "self.omega :",
+            self.omega,
+        )
 
         return delta_lm
 
@@ -88,7 +103,7 @@ class DeltaLongitudinalModularityComputer:
                 [neighb for neighb in leaf.topo_neighbors | leaf.topo_neighbors_from]
             )
         # Only keep inventoried neighbors that are in M0
-        # NOTE cannot use a set here because we want to keep duplicated time nodes
+        # Note: cannot use a set here because we want to keep duplicated time nodes
         neighbors_weights = [
             neighb.weight * neighb.duration for neighb in all_neighbs if neighb.target in M0_leaves
         ]
@@ -166,8 +181,8 @@ class DeltaLongitudinalModularityComputer:
             degree_out_Cx = self._sum_degrees_out(Mx_leaves)
             degree_out_Cx_U_C0 = self._sum_degrees_out(Mx_leaves | M0_leaves)
             expectation_diff = (
-                2 * degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
-                - 2 * degree_in_Cx * degree_out_Cx * duration_Cx
+                degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
+                - degree_in_Cx * degree_out_Cx * duration_Cx
             ) / (4 * self.linkstream.weight * self.linkstream.network_duration)
         else:
             degree_Cx = self._sum_degrees(Mx_leaves)

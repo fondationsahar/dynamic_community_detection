@@ -262,20 +262,25 @@ class TimeModules:
 
     def __init__(
         self,
-        raw_modules: dict[int, set[tuple[int, int]]] | None = None,
+        raw_modules: dict[int, set[tuple[int, int]]] | dict[int, dict] | None = None,
         *,
         path: str | Path | None = None,
     ):
         """Initialize TimeModules.
 
-        Can be initialized in three ways:
+        Can be initialized in four ways:
         1. From raw module data: `TimeModules({0: {(0, 0), (1, 0)}})`
-        2. Empty: `TimeModules()`
-        3. From file: `TimeModules(path="communities.csv")`
+        2. From segment format: `TimeModules({0: {"nodes": {"0": [[0, 2]], "1": [[0, 0]]}}})`
+        3. Empty: `TimeModules()`
+        4. From file: `TimeModules(path="communities.csv")`
 
         Args:
-            raw_modules: Mapping from module label to set of (node, time) tuples.
-                Example: {0: {(node1, time1), (node2, time1), ...}, 1: {...}}
+            raw_modules: Module data in one of two formats:
+                - Standard format: {module_label: {(node, time), ...}}
+                  Example: {0: {(0, 0), (0, 1), (1, 0)}, 1: {(2, 0)}}
+                - Segment format: {module_label: {"nodes": {node: [[start, end], ...]}}}
+                  Example: {0: {"nodes": {"0": [[0, 2]], "1": [[0, 0]]}}}
+                  Each segment [start, end] is inclusive.
                 If None and no path given, creates empty TimeModules.
             path: Path to a file to load from. Supports .csv, .json, .txt formats.
                 Auto-detects format from file extension. For JSON, auto-detects
@@ -294,6 +299,9 @@ class TimeModules:
         # Default to empty dict if nothing provided
         if raw_modules is None:
             raw_modules = {}
+
+        # Auto-detect and convert segment format to standard format
+        raw_modules = self._normalize_input_format(raw_modules)
 
         self._raw_modules = raw_modules
 
@@ -324,6 +332,172 @@ class TimeModules:
                 self._node_to_modules[node][module_label].add(time)
                 self._time_to_nodes[time][node] = module_label
                 self._module_to_nodes[module_label][node].add(time)
+
+    @staticmethod
+    def _normalize_input_format(
+        data: dict[int, set[tuple[int, int]]] | dict[int, dict] | dict,
+    ) -> dict[int, set[tuple[int, int]]]:
+        """Convert segment format to standard format if needed.
+
+        Args:
+            data: Module data in either standard or segment format.
+
+        Returns:
+            Module data in standard format: {module_label: {(node, time), ...}}.
+
+        Raises:
+            TypeError: If the input format is not recognized.
+
+        Supported input formats:
+            1. Standard format: {module: {(node, time), ...}}
+            2. Segment format with "nodes" key: {module: {"nodes": {node: [[start, end], ...]}}}
+            3. Segment format without "nodes" key: {module: {node: [[start, end], ...]}}
+            4. List format: {module: [[node, time], ...]}
+        """
+        if not data:
+            return {}
+
+        # Check first value to detect format
+        first_key = next(iter(data.keys()))
+        first_value = next(iter(data.values()))
+
+        # If first value is a set, it's already standard format
+        if isinstance(first_value, set):
+            # Validate that it contains tuples
+            if first_value:
+                sample = next(iter(first_value))
+                if not isinstance(sample, tuple) or len(sample) != 2:
+                    raise TypeError(
+                        f"Invalid standard format. Expected set of (node, time) tuples, "
+                        f"but got set containing {type(sample).__name__}.\n"
+                        f"Expected: {{module_label: {{(node, time), ...}}}}\n"
+                        f"Example: {{0: {{(0, 0), (0, 1), (1, 0)}}}}"
+                    )
+            return data  # type: ignore
+
+        # If first value is a dict, check what kind
+        if isinstance(first_value, dict):
+            # Check if it has the "nodes" wrapper key
+            if "nodes" in first_value:
+                # Segment format WITH "nodes" key
+                raw_modules: dict[int, set[tuple[int, int]]] = {}
+                for module_key, content in data.items():
+                    try:
+                        module = int(module_key)
+                    except (ValueError, TypeError) as e:
+                        raise TypeError(
+                            f"Module key must be convertible to int, got {type(module_key).__name__}: {module_key}"
+                        ) from e
+                    raw_modules[module] = set()
+                    nodes_data = content.get("nodes", {})
+                    if not isinstance(nodes_data, dict):
+                        raise TypeError(
+                            f"'nodes' value must be a dict, got {type(nodes_data).__name__}.\n"
+                            f"Expected: {{module: {{'nodes': {{node: [[start, end], ...]}}}}}}"
+                        )
+                    for node_key, segments in nodes_data.items():
+                        try:
+                            node = int(node_key)
+                        except (ValueError, TypeError) as e:
+                            raise TypeError(
+                                f"Node key must be convertible to int, got {type(node_key).__name__}: {node_key}"
+                            ) from e
+                        if not isinstance(segments, list):
+                            raise TypeError(
+                                f"Segments must be a list of [start, end] pairs, got {type(segments).__name__}.\n"
+                                f"Expected: [[start, end], [start, end], ...]"
+                            )
+                        for segment in segments:
+                            if not isinstance(segment, (list, tuple)) or len(segment) != 2:
+                                raise TypeError(
+                                    f"Each segment must be a [start, end] pair, got {segment}.\n"
+                                    f"Expected: [start_time, end_time] where both are integers"
+                                )
+                            start, end = int(segment[0]), int(segment[1])
+                            for time in range(start, end + 1):
+                                raw_modules[module].add((node, time))
+                return raw_modules
+            else:
+                # Segment format WITHOUT "nodes" key: {module: {node: [[start, end], ...]}}
+                first_node_value = next(iter(first_value.values()), None)
+                if (
+                    isinstance(first_node_value, list)
+                    and first_node_value
+                    and isinstance(first_node_value[0], (list, tuple))
+                ):
+                    raw_modules = {}
+                    for module_key, nodes_data in data.items():
+                        try:
+                            module = int(module_key)
+                        except (ValueError, TypeError) as e:
+                            raise TypeError(
+                                f"Module key must be convertible to int, got {type(module_key).__name__}: {module_key}"
+                            ) from e
+                        raw_modules[module] = set()
+                        for node_key, segments in nodes_data.items():
+                            try:
+                                node = int(node_key)
+                            except (ValueError, TypeError) as e:
+                                raise TypeError(
+                                    f"Node key must be convertible to int, got {type(node_key).__name__}: {node_key}"
+                                ) from e
+                            for segment in segments:
+                                if not isinstance(segment, (list, tuple)) or len(segment) != 2:
+                                    raise TypeError(
+                                        f"Each segment must be a [start, end] pair, got {segment}"
+                                    )
+                                start, end = int(segment[0]), int(segment[1])
+                                for time in range(start, end + 1):
+                                    raw_modules[module].add((node, time))
+                    return raw_modules
+                else:
+                    # Unknown dict format
+                    raise TypeError(
+                        f"Unrecognized dict format for module {first_key}.\n"
+                        f"Expected one of:\n"
+                        f"  1. Standard: {{module: {{(node, time), ...}}}}\n"
+                        f"  2. Segment with 'nodes': {{module: {{'nodes': {{node: [[start, end], ...]}}}}}}\n"
+                        f"  3. Segment without 'nodes': {{module: {{node: [[start, end], ...]}}}}\n"
+                        f"Got: {type(first_value).__name__} with first value: {first_node_value}"
+                    )
+
+        # If first value is a list, assume list format [[node, time], ...]
+        if isinstance(first_value, list):
+            raw_modules_list: dict[int, set[tuple[int, int]]] = {}
+            for module_key, members in data.items():
+                try:
+                    module = int(module_key)
+                except (ValueError, TypeError) as e:
+                    raise TypeError(
+                        f"Module key must be convertible to int, got {type(module_key).__name__}: {module_key}"
+                    ) from e
+                raw_modules_list[module] = set()
+                for member in members:
+                    if not isinstance(member, (list, tuple)) or len(member) < 2:
+                        raise TypeError(
+                            f"Each member must be a [node, time] pair, got {member}.\n"
+                            f"Expected: {{module: [[node, time], [node, time], ...]}}"
+                        )
+                    raw_modules_list[module].add((int(member[0]), int(member[1])))
+            return raw_modules_list
+
+        # Unknown format
+        raise TypeError(
+            f"Unrecognized input format. Got module {first_key} with value type {type(first_value).__name__}.\n\n"
+            f"Expected one of these formats:\n"
+            f"  1. Standard format:\n"
+            f"     {{module_label: {{(node, time), ...}}}}\n"
+            f"     Example: {{0: {{(0, 0), (0, 1), (1, 0)}}}}\n\n"
+            f"  2. Segment format (with 'nodes' key):\n"
+            f"     {{module_label: {{'nodes': {{node: [[start, end], ...]}}}}}}\n"
+            f"     Example: {{0: {{'nodes': {{'0': [[0, 5]], '1': [[2, 8]]}}}}}}\n\n"
+            f"  3. Segment format (without 'nodes' key):\n"
+            f"     {{module_label: {{node: [[start, end], ...}}}}\n"
+            f"     Example: {{0: {{'0': [[0, 5]], '1': [[2, 8]]}}}}\n\n"
+            f"  4. List format:\n"
+            f"     {{module_label: [[node, time], ...]}}\n"
+            f"     Example: {{0: [[0, 0], [0, 1], [1, 0]]}}"
+        )
 
     @staticmethod
     def _load_from_file(path: str | Path) -> dict[int, set[tuple[int, int]]]:

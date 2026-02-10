@@ -14,7 +14,7 @@ from .tmm import TimeModuleMover
 def lago_run(
     linkstream: LinkStream,
     lex: str,
-    alpha: float,
+    gamma: float,
     omega: float,
     refinement: str | None,
     fast_exploration: bool,
@@ -58,7 +58,7 @@ def lago_run(
     time_module_mover, refiner = _init_movers(
         linkstream,
         lex,
-        alpha,
+        gamma,
         omega,
         fast_exploration,
         refinement,
@@ -87,7 +87,7 @@ def lago_run(
 def _init_movers(
     linkstream: LinkStream,
     lex: str,
-    alpha: float,
+    gamma: float,
     omega: float,
     fast_exploration: bool,
     refinement: str | None,
@@ -97,7 +97,7 @@ def _init_movers(
     lm_computer = DeltaLongitudinalModularityComputer(
         linkstream,
         lex,
-        alpha,
+        gamma,
         omega,
     )
     time_module_mover = TimeModuleMover(

@@ -273,7 +273,7 @@ def longitudinal_modularity(
         time_penalty = 0.0
     else:
         switch_count = _count_community_switches(linkstream, labels)
-        time_penalty = -omega / (2 * linkstream.weight) * switch_count
+        time_penalty = -omega / (2 * linkstream.nb_edges) * switch_count
 
     # 4 - Aggregation
     lm_modularity = 0.0

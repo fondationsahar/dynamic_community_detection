@@ -47,10 +47,7 @@ class DeltaLongitudinalModularityComputer:
             float: Δ L-Modularity of the movement
         """
 
-        weight_diff = self._get_weight_diff(M0_leaves, Mx_leaves)
-
-        if self.linkstream.directed:
-            weight_diff *= 2
+        weight_diff = 2 * self._get_weight_diff(M0_leaves, Mx_leaves)
 
         if self.lex == "MM":
             expectation_diff = self._get_expectation_mm_part(
@@ -70,19 +67,12 @@ class DeltaLongitudinalModularityComputer:
 
         csc_diff = self._get_csc_diff(M0_time_segments, Mx_leaves)
 
-        delta_lm = weight_diff - self.gamma * expectation_diff + self.omega * csc_diff
+        ls = self.linkstream
 
-        print(
-            "weight_diff:",
-            weight_diff,
-            "| expectation_diff:",
-            expectation_diff,
-            " | csc_diff:",
-            csc_diff,
-            "self.gamma:",
-            self.gamma,
-            "self.omega :",
-            self.omega,
+        delta_lm = (
+            weight_diff
+            - self.gamma * expectation_diff
+            + self.omega * csc_diff * ls.weight / ls.nb_edges
         )
 
         return delta_lm

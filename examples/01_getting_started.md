@@ -211,7 +211,11 @@ communities = lago_modules(ls, alpha=0.5)
 
 ## Next Steps
 
-- [02_linkstream_types.py](02_linkstream_types.py) - Learn about directed, continuous, and delayed networks
-- [03_community_detection.py](03_community_detection.py) - Advanced community detection options
-- [04_modularity.py](04_modularity.py) - Understand and compute longitudinal modularity
-- [05_visualization.py](05_visualization.py) - Visualize your results
+**Core Learning Path:**
+- [02_linkstream_types.ipynb](02_linkstream_types.ipynb) - Learn about directed, continuous, and delayed networks
+- [03_community_detection.ipynb](03_community_detection.ipynb) - Advanced community detection options
+- [04_modularity.ipynb](04_modularity.ipynb) - Understand and compute longitudinal modularity
+- [05_visualization.ipynb](05_visualization.ipynb) - Visualize your results
+
+**Practical Guides:**
+- [real_world_preprocessing.ipynb](real_world_preprocessing.ipynb) - Work with real-world data (names, dates)

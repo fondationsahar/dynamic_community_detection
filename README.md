@@ -121,10 +121,15 @@ communities.to_json("results.json")
 - [API Reference](docs/API_REFERENCE.md) — Complete function documentation
 
 📁 **Examples** ([examples/](examples/))
-- [LinkStream Types](examples/02_linkstream_types.py) — Weighted, directed, continuous, delayed, k-partite networks
-- [Community Detection](examples/03_community_detection.py) — Using `lago_modules` and exploring results
-- [Modularity](examples/04_modularity.py) — Computing and understanding quality scores
-- [Visualization](examples/05_visualization.py) — Creating publication-ready plots
+- [LinkStream Types](examples/02_linkstream_types.ipynb) — Weighted, directed, continuous, delayed, k-partite networks
+- [Community Detection](examples/03_community_detection.ipynb) — Using `lago_modules` and exploring results
+- [Modularity](examples/04_modularity.ipynb) — Computing and understanding quality scores
+- [Visualization](examples/05_visualization.ipynb) — Creating publication-ready plots
+
+💡 **Practical Guides**
+- [Real-World Preprocessing](examples/real_world_preprocessing.ipynb) — Working with names and date strings
+
+All examples are interactive Jupyter notebooks. Run `jupyter notebook` in the examples folder to get started!
 
 📄 **Papers**
 - [LAGO Method (arXiv)](https://arxiv.org/abs/2510.00741) — Algorithm details and experiments

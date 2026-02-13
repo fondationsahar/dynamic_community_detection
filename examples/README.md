@@ -6,13 +6,13 @@ This folder contains examples to help you get started with LAGO for temporal com
 
 **Core Learning Path** (follow in order):
 
-| File | Description | Difficulty |
-|------|-------------|------------|
-| `01_getting_started.md` | Introduction to LinkStream and basic concepts | 🟢 Beginner |
-| `02_linkstream_types.ipynb` | Different types of temporal networks | 🟢 Beginner |
-| `03_community_detection.ipynb` | Detecting communities with `lago_modules` | 🟡 Intermediate |
-| `04_modularity.ipynb` | Computing longitudinal modularity | 🟡 Intermediate |
-| `05_visualization.ipynb` | Creating visualizations | 🟡 Intermediate |
+| File | Description | 
+|------|-------------|
+| `01_getting_started.md` | Introduction to LinkStream and basic concepts | 
+| `02_linkstream_types.ipynb` | Different types of temporal networks | 
+| `03_community_detection.ipynb` | Detecting communities with `lago_modules` | 
+| `04_modularity.ipynb` | Computing longitudinal modularity | 
+| `05_visualization.ipynb` | Creating visualizations | 
 
 **Practical Guides** (use when needed):
 

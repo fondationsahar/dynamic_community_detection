@@ -1883,6 +1883,7 @@ class LongitudinalModulesPlot:
                         self.show_edge_orientation,
                         self.linkstream.directed,
                         self.edge_curve_intensity,
+                        self.edge_linewidth,
                     )
                 else:
                     draw_edges(

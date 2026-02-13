@@ -89,9 +89,8 @@ class DeltaLongitudinalModularityComputer:
         """
         all_neighbs = list()
         for leaf in Mx_leaves:
-            all_neighbs += list(
-                [neighb for neighb in leaf.topo_neighbors | leaf.topo_neighbors_from]
-            )
+            all_neighbs += list([neighb for neighb in leaf.topo_neighbors])
+
         # Only keep inventoried neighbors that are in M0
         # Note: cannot use a set here because we want to keep duplicated time nodes
         neighbors_weights = [

@@ -224,6 +224,9 @@ def longitudinal_modularity(
         result = longitudinal_modularity(ls, tm, lex=LexType.MM)
         ```
     """
+
+    # TODO Implement the multipartite case
+
     # Validate and normalize lex
     lex = _validate_lex(lex)
     # Handle TimeModules input - use its pre-computed structures
@@ -277,10 +280,15 @@ def longitudinal_modularity(
 
     # 4 - Aggregation
     lm_modularity = 0.0
+    log_nblinks = 0
+    log_expectations = 0
     for community, expectation in communities_expectations.items():
         nb_links = communities_nb_interactions.get(community, 0)
+        log_nblinks += nb_links / 2
+        log_expectations += expectation * linkstream.weight
         lm_modularity += nb_links / (2 * linkstream.weight) - gamma * expectation
-
+    print("log_nblinks:", log_nblinks)
+    print("log_expectations:", log_expectations)
     lm_modularity += time_penalty
 
     return ModularityResult(
@@ -317,16 +325,20 @@ def _count_intra_community_interactions(
             continue
         if community not in communities_nb_interactions:
             communities_nb_interactions[community] = 0
-
-        neighbors = leaf.topo_neighbors | leaf.topo_neighbors_from
+        neighbors = leaf.topo_neighbors
         for neighbor in neighbors:
             neighbor_key = (neighbor.target.node, neighbor.target.time)
             if labels.get(neighbor_key) != community:
                 continue
-            # Avoid double counting self-loops
-            weight_multiplier = 2 if neighbor.target == leaf else 1
+            # Avoid double count self-loops to remain consistant with other interactions already counted twice
+            weight_multiplier = 2 if neighbor.target == leaf and not linkstream.directed else 1
             communities_nb_interactions[community] += weight_multiplier * neighbor.weight
 
+    # NOTE reformulate that maybe
+    if linkstream.directed:
+        communities_nb_interactions = {
+            key: val * 2 for key, val in communities_nb_interactions.items()
+        }
     return communities_nb_interactions
 
 

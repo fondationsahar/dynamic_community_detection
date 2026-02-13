@@ -410,6 +410,7 @@ def draw_edges_delayed(
     show_edge_orientation: bool = False,
     is_directed: bool = False,
     curve_intensity: float = 0.0,
+    linewidth: float = 1.0,
 ):
     """
     Draw edges between nodes for delayed linkstreams.
@@ -427,6 +428,8 @@ def draw_edges_delayed(
         is_directed: Whether the linkstream is directed
         curve_intensity: Controls curve intensity for delayed edges (0.0 = straight,
             positive = curve right, negative = curve left). Default 0.0.
+        linewidth: Base edge line width in points. This is multiplied by edge weight.
+            Default 1.0.
     """
     # For undirected graphs, lago LinkStream returns both A→B and B→A
     # We need to filter to only draw each unique edge once
@@ -467,14 +470,14 @@ def draw_edges_delayed(
             source_time=source_time,
             target_time=target_time,
             edge_flatten_factor=edge_flatten_factor,
-            linewidth=weight,
+            linewidth=linewidth * weight,
             straight=True,
             curve_intensity=curve_intensity,
         )
 
         # Draw arrow head for edge orientation if requested and linkstream is directed
         if show_edge_orientation and is_directed:
-            draw_arrow_head(ax, center1, center2, "black", edge_alpha, weight)
+            draw_arrow_head(ax, center1, center2, "black", edge_alpha, linewidth * weight)
 
 
 def draw_night_highlights(ax: Axes, nights: list, end_nodes: dict):

@@ -379,13 +379,24 @@ plot.configure_nodes(
 
 ```python
 plot.configure_edges(
-    show_edges: bool = True,              # Show arc edges
-    show_activity: bool = False,          # Show activity markers
-    activity_width: float = 0.8,
-    activity_height: float = 0.5,
-    activity_alpha: float = 0.3,
+    show_edges: bool = False,             # Show arc edges
+    show_activity: bool = True,           # Show activity markers
+    # Edge style parameters
+    edge_alpha: float = 0.15,             # Edge transparency (0.0-1.0)
+    edge_flatten_factor: float = 5,       # Arc flatness (higher = flatter)
+    edge_color: bool = False,             # Color edges by module
+    edge_orientation: bool = False,       # Show arrow heads (directed graphs)
+    edge_linewidth: float = 1.0,          # Edge line width in points
+    edge_curve_intensity: float = 0.0,    # Curve intensity for delayed linkstreams
+                                          # (0.0=straight, +ve=right, -ve=left)
+    # Activity marker parameters
+    activity_width: float = 0.8,          # Marker width (0.0-1.0)
+    activity_height: float = 0.4,         # Marker height (0.0-1.0)
+    activity_alpha: float | None = None,  # Marker alpha (None = use edge_alpha)
 )
 ```
+
+**Note:** For delayed linkstreams, `edge_linewidth` sets the base line width, which is then multiplied by edge weights for weighted visualization.
 
 #### configure_modules()
 

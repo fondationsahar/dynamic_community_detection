@@ -838,9 +838,9 @@ class LongitudinalModulesPlot:
         text: str = "Time",
         fontsize: int | None = None,
         fontweight: str = "bold",
-        coords: tuple[float, float] = (0.0, 0.025),
+        coords: tuple[float, float] = (0.0, 0.5),
         rotation: float = 0.0,
-        ha: str = "left",
+        ha: str = "center",
     ) -> "LongitudinalModulesPlot":
         """
         Customize the X-axis label appearance and position.

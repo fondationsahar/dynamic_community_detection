@@ -14,16 +14,19 @@ class SingleTimeNodeMover(TimeModuleMover):
         modules: set[_LagoModule],
         delta_lm_computer: DeltaLongitudinalModularityComputer,
         partite_mapping: dict[int, int],
+        stopping_criterion: float = 0.0,
     ) -> None:
         super().__init__(
             fast_exploration,
             modules,
             delta_lm_computer,
             partite_mapping,
+            stopping_criterion,
         )
 
     def run(
         self,
+        verbose: bool | int = 0,
     ) -> float:
         """Single Time Node Movements refinement strategy:
             1 - each active time node is assign to its own module and
@@ -31,12 +34,15 @@ class SingleTimeNodeMover(TimeModuleMover):
             2 - submodules (active time nodes) are moved between parent
             modules as long as it optimizes L-Modularity
 
+        Args:
+            verbose: Verbosity level for loop tracking (3+ enables tracking).
+
         Returns:
             float: Δ L-Modularity between initial state and final state.
         """
 
         leaves_modules = self._stnm_iterator()
-        delta_longitudinal_modularity = self._exploration_loop(leaves_modules)
+        delta_longitudinal_modularity = self._exploration_loop(leaves_modules, verbose)
 
         self._update_modules_after_stnm(leaves_modules)
 

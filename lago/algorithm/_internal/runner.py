@@ -19,7 +19,7 @@ def lago_run(
     refinement: str | None,
     fast_exploration: bool,
     refinement_in: bool,
-    verbose: bool,
+    verbose: bool | int,
     stopping_criterion: float,
     ndigits_logs: int,
 ):
@@ -49,7 +49,8 @@ def lago_run(
             in better results or more chances to get stuck in local optimum. It is also more time
             consuming.
             Defaults to False.
-        verbose (bool, optional): Whether to print intermediate reports or not.
+        verbose (bool | int, optional): Verbosity level. 0=silent, 1=progress info,
+            2=detailed debug, 3=infinite loop tracking.
             Defaults to False.
     Returns:
         float: Δ L-Modularity between initial state and final state.
@@ -62,6 +63,7 @@ def lago_run(
         omega,
         fast_exploration,
         refinement,
+        stopping_criterion,
     )
     if refinement_in:
         return run_with_refinement_in_rtmm(
@@ -91,6 +93,7 @@ def _init_movers(
     omega: float,
     fast_exploration: bool,
     refinement: str | None,
+    stopping_criterion: float,
 ):
     modules = _init_modules(linkstream)
 
@@ -105,6 +108,7 @@ def _init_movers(
         modules,
         lm_computer,
         linkstream.partite_mapping,
+        stopping_criterion,
     )
 
     refiner = None
@@ -115,6 +119,7 @@ def _init_movers(
             modules,
             lm_computer,
             linkstream.partite_mapping,
+            stopping_criterion,
         )
 
     elif refinement == "STEM":
@@ -123,6 +128,7 @@ def _init_movers(
             fast_exploration,
             modules,
             lm_computer,
+            stopping_criterion,
         )
 
     return time_module_mover, refiner

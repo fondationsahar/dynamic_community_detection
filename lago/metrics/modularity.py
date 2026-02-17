@@ -287,8 +287,6 @@ def longitudinal_modularity(
         log_nblinks += nb_links / 2
         log_expectations += expectation * linkstream.weight
         lm_modularity += nb_links / (2 * linkstream.weight) - gamma * expectation
-    print("log_nblinks:", log_nblinks)
-    print("log_expectations:", log_expectations)
     lm_modularity += time_penalty
 
     return ModularityResult(

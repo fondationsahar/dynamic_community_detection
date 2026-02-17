@@ -255,7 +255,11 @@ class LinkStream:
 
         Raises:
             TypeError: If time is not an integer.
+            ValueError: If duplicate edges are detected.
         """
+        # Track edges to detect duplicates
+        seen_edges: set[tuple[int, int, int]] = set()
+
         for link in links:
             if len(link) > 3:
                 source, target, time_raw, weight = link[0], link[1], link[2], link[3]
@@ -265,6 +269,28 @@ class LinkStream:
 
             # Validate time is an integer
             time = self._validate_time(time_raw, "time")
+
+            # Check for duplicate edges
+            edge_key = (source, target, time)
+            if edge_key in seen_edges:
+                if self.directed:
+                    raise ValueError(
+                        f"Duplicate edge detected: ({source}, {target}, {time}). "
+                        f"The same edge appears multiple times in your input. "
+                        f"Please either:\n"
+                        f"  1. Keep only one occurrence of this edge, or\n"
+                        f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream."
+                    )
+                else:
+                    raise ValueError(
+                        f"Duplicate edge detected: ({source}, {target}, {time}). "
+                        f"The same edge appears multiple times in your input. "
+                        f"Please either:\n"
+                        f"  1. Keep only one occurrence of this edge, or\n"
+                        f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream.\n"
+                        f"Note: For undirected graphs, (A, B, t) and (B, A, t) are considered the same edge."
+                    )
+            seen_edges.add(edge_key)
 
             self.nb_edges += 1
             self.weight += weight
@@ -329,11 +355,15 @@ class LinkStream:
 
         Raises:
             TypeError: If time or duration is not an integer.
+            ValueError: If duplicate edges are detected.
 
         Note:
             Times must be integers. The total weight of a continuous link
             is weight * duration.
         """
+        # Track edges to detect duplicates
+        seen_edges: set[tuple[int, int, int, int]] = set()
+
         for link in links:
             if len(link) > 4:
                 source, target, time_raw, duration_raw, initial_weight = (
@@ -350,6 +380,28 @@ class LinkStream:
             # Validate time and duration are integers
             time = self._validate_time(time_raw, "time")
             duration = self._validate_time(duration_raw, "duration")
+
+            # Check for duplicate edges
+            edge_key = (source, target, time, duration)
+            if edge_key in seen_edges:
+                if self.directed:
+                    raise ValueError(
+                        f"Duplicate edge detected: ({source}, {target}, {time}, {duration}). "
+                        f"The same edge appears multiple times in your input. "
+                        f"Please either:\n"
+                        f"  1. Keep only one occurrence of this edge, or\n"
+                        f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream."
+                    )
+                else:
+                    raise ValueError(
+                        f"Duplicate edge detected: ({source}, {target}, {time}, {duration}). "
+                        f"The same edge appears multiple times in your input. "
+                        f"Please either:\n"
+                        f"  1. Keep only one occurrence of this edge, or\n"
+                        f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream.\n"
+                        f"Note: For undirected graphs, (A, B, t, d) and (B, A, t, d) are considered the same edge."
+                    )
+            seen_edges.add(edge_key)
 
             # Weight is scaled by duration for continuous links
             weight = initial_weight * duration
@@ -439,10 +491,14 @@ class LinkStream:
 
         Raises:
             TypeError: If times are not integers.
+            ValueError: If duplicate edges are detected.
 
         Note:
             Times must be integers.
         """
+        # Track edges to detect duplicates
+        seen_edges: set[tuple[int, int, int, int]] = set()
+
         for link in links:
             if len(link) > 4:
                 source, target, source_time_raw, target_time_raw, weight = (
@@ -464,6 +520,19 @@ class LinkStream:
             # Validate times are integers
             source_time = self._validate_time(source_time_raw, "source_time")
             target_time = self._validate_time(target_time_raw, "target_time")
+
+            # Check for duplicate edges
+            edge_key = (source, target, source_time, target_time)
+            if edge_key in seen_edges:
+                raise ValueError(
+                    f"Duplicate edge detected: ({source}, {target}, {source_time}, {target_time}). "
+                    f"The same edge appears multiple times in your input. "
+                    f"Please either:\n"
+                    f"  1. Keep only one occurrence of this edge, or\n"
+                    f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream.\n"
+                    f"Note: For undirected graphs, (A, B, t1, t2) and (B, A, t1, t2) are considered the same edge."
+                )
+            seen_edges.add(edge_key)
 
             self.nb_edges += 1
             self.weight += weight

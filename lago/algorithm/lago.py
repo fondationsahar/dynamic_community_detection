@@ -55,7 +55,8 @@ def lago_modules(
             Applying within implies more exploration, which may result in better
             results or more chances to get stuck in local optimum. More time-consuming.
             Defaults to True.
-        verbose: Verbosity level. 0=silent, 1=progress info, 2=detailed debug.
+        verbose: Verbosity level. 0=silent, 1=progress info, 2=detailed debug,
+            3=infinite loop tracking (logs iteration counts and warnings).
             Also accepts bool for backward compatibility (True=1, False=0).
             Defaults to 0.
         stopping_criterion: Convergence threshold. Defaults to 1e-8.
@@ -128,8 +129,8 @@ def lago_modules(
     best_modularity = -sys.maxsize
     best_modules: set[_LagoModule] = set()
 
-    # Convert verbose to bool for internal lago_run (maintains backward compat)
-    verbose_bool = bool(verbose)
+    # Convert verbose to int for internal lago_run
+    verbose_int = int(verbose) if isinstance(verbose, bool) else verbose
 
     for iteration in range(nb_iter):
         log_info(f"Starting iteration {iteration + 1}/{nb_iter}", verbose)
@@ -142,8 +143,8 @@ def lago_modules(
             refinement,
             fast_exploration,
             refinement_in,
-            verbose_bool,
-            stopping_criterion,
+            verbose_int,
+            stopping_criterion * linkstream.weight,
             ndigits_logs,
         )
 

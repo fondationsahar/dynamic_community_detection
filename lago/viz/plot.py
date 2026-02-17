@@ -877,9 +877,9 @@ class LongitudinalModulesPlot:
         text: str = "Nodes",
         fontsize: int | None = None,
         fontweight: str = "bold",
-        coords: tuple[float, float] = (-0.05, 1.0),
+        coords: tuple[float, float] = (-0.01, 0.5),
         rotation: float = 90.0,
-        ha: str = "right",
+        ha: str = "center",
     ) -> "LongitudinalModulesPlot":
         """
         Customize the Y-axis label appearance and position.

@@ -172,7 +172,7 @@ class DeltaLongitudinalModularityComputer:
             expectation_diff = (
                 degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
                 - degree_in_Cx * degree_out_Cx * duration_Cx
-            ) / (4 * self.linkstream.weight * self.linkstream.network_duration)
+            ) / (2 * self.linkstream.weight * self.linkstream.network_duration)
         else:
             degree_Cx = self._sum_degrees(Mx_leaves)
             degree_Cx_U_C0 = self._sum_degrees(Mx_leaves | M0_leaves)
@@ -218,7 +218,7 @@ class DeltaLongitudinalModularityComputer:
                 expectation_diff += (degree_in1 * degree_out2 + degree_in2 * degree_out1) * (
                     duration_Cx_U_C0 - in_Cx[node1] * in_Cx[node2] * duration_Cx
                 )
-            expectation_diff /= 4 * self.linkstream.weight * self.linkstream.network_duration
+            expectation_diff /= 2 * self.linkstream.weight * self.linkstream.network_duration
 
         else:
             # In k-partite networks, only interactions between different partites are expected

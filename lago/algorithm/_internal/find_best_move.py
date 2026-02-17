@@ -4,12 +4,38 @@ from .delta_lm import (
     DeltaLongitudinalModularityComputer,
 )
 
+# Global counters for tracking (only used when verbose >= 3)
+_find_best_stats = {
+    "calls": 0,
+    "no_modules": 0,
+    "no_improvement": 0,
+    "success": 0,
+}
+
+
+def reset_find_best_stats():
+    """Reset statistics counters."""
+    global _find_best_stats
+    _find_best_stats = {
+        "calls": 0,
+        "no_modules": 0,
+        "no_improvement": 0,
+        "success": 0,
+    }
+
+
+def get_find_best_stats():
+    """Get current statistics."""
+    return _find_best_stats.copy()
+
 
 def find_best_module_for_submodule(
     delta_lm_computer: DeltaLongitudinalModularityComputer,
     submodule: _LagoModule,
     partite_mapping: dict[int, int] = {},
     modules: list[_LagoModule] | None = None,
+    verbose: bool | int = 0,
+    stopping_criterion: float = 0.0,
 ):
     """Find best module to move the submodule to.
     First compute the gain of moving Submodule M0 from its module M1,
@@ -22,6 +48,7 @@ def find_best_module_for_submodule(
             parent modules between which to move submodule.
             If not specified, parents of the submodule
             neighbors are considered. Defaults to None.
+        verbose (bool | int, optional): Verbosity level for tracking.
 
     Returns:
         tuple: (
@@ -29,6 +56,9 @@ def find_best_module_for_submodule(
             float: Δ L-Modularity gain from the move
         )
     """
+    global _find_best_stats
+    _find_best_stats["calls"] += 1
+
     if modules is None:
         # Get parents of submodule neighbors
         neighbors = submodule.neighbors
@@ -39,6 +69,7 @@ def find_best_module_for_submodule(
         modules.remove(submodule.parent)
 
     if not modules:
+        _find_best_stats["no_modules"] += 1
         return None, None
 
     M0_leaves = submodule.leaves
@@ -46,6 +77,7 @@ def find_best_module_for_submodule(
         module_leaves=M0_leaves,
     )
     if not submodule.parent:
+        _find_best_stats["no_modules"] += 1
         return None, None
 
     M1_leaves = submodule.parent.leaves - M0_leaves
@@ -75,13 +107,16 @@ def find_best_module_for_submodule(
         candidates_delta_lm[module] = delta_lm_M0_leaving_M1 + delta_lm_M0_joining_M2
 
     if not candidates_delta_lm:
+        _find_best_stats["no_improvement"] += 1
         return None, None
 
     delta_lm = max(candidates_delta_lm.values())
-    if delta_lm <= 0:
-        # No move improves LM, continue exploring...
+    if delta_lm <= stopping_criterion:
+        # No move improves LM beyond stopping criterion, continue exploring...
+        _find_best_stats["no_improvement"] += 1
         return None, None
 
     best_module = [module for module, dlm in candidates_delta_lm.items() if dlm == delta_lm][0]
+    _find_best_stats["success"] += 1
 
     return best_module, delta_lm

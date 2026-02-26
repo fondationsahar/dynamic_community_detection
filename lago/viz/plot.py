@@ -1565,10 +1565,14 @@ class LongitudinalModulesPlot:
                         self.node_labels[nodes_mapping[node]] = label
 
         # ALWAYS remap node focus (not just when auto_nodes_ordering)
+        # Use a local variable to avoid mutating self.node_focus, which would corrupt
+        # repeated calls to _prepare_data() (e.g. get_node_order() then draw()).
         if self.node_focus:
-            self.node_focus = [
+            remapped_node_focus = [
                 nodes_mapping[nfo] for nfo in self.node_focus if nfo in nodes_mapping
             ]
+        else:
+            remapped_node_focus = []
 
         # Store the final nodes_to_display list with mapped indices
         # Only include nodes that are in the mapping
@@ -1619,7 +1623,7 @@ class LongitudinalModulesPlot:
         else:
             # Use node_focus and time_focus to determine focused modules
             self._focused_modules, remaining_modules = prepare_modules_for_display(
-                self._remapped_modules, self.node_focus, self.time_focus, False
+                self._remapped_modules, remapped_node_focus, self.time_focus, False
             )
 
         # Step 2: From remaining, split into secondary (with colors) and background (gainsboro)

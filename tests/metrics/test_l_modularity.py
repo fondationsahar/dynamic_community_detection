@@ -38,6 +38,9 @@ class TestBasicFunctionality:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(
+            f"\n  [two_communities] value={result.value}, time_penalty={result.time_penalty}, lex={result.lex}"
+        )
         assert isinstance(result, ModularityResult)
         # Good partition should have positive modularity
         assert result.value > 0
@@ -57,6 +60,9 @@ class TestBasicFunctionality:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(
+            f"\n  [all_in_one] value={result.value}, time_penalty={result.time_penalty}, lex={result.lex}"
+        )
         assert isinstance(result, ModularityResult)
         assert isinstance(result.value, float)
 
@@ -77,6 +83,9 @@ class TestBasicFunctionality:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(
+            f"\n  [each_node_own] value={result.value}, time_penalty={result.time_penalty}, lex={result.lex}"
+        )
         assert isinstance(result, ModularityResult)
 
     def test_empty_community_ignored(self) -> None:
@@ -95,6 +104,9 @@ class TestBasicFunctionality:
 
         # Should not raise
         result = longitudinal_modularity(ls, communities)
+        print(
+            f"\n  [empty_community] value={result.value}, time_penalty={result.time_penalty}, lex={result.lex}"
+        )
         assert isinstance(result, ModularityResult)
 
 
@@ -130,6 +142,7 @@ class TestExpectationTypes:
         """Test Mean Modularity (MM) expectation."""
         ls, communities = simple_linkstream_and_communities
         result = longitudinal_modularity(ls, communities, lex=LexType.MM)
+        print(f"\n  [MM] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
         assert result.lex == LexType.MM
 
@@ -137,6 +150,7 @@ class TestExpectationTypes:
         """Test Joint Modularity (JM) expectation."""
         ls, communities = simple_linkstream_and_communities
         result = longitudinal_modularity(ls, communities, lex=LexType.JM)
+        print(f"\n  [JM] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
         assert result.lex == LexType.JM
 
@@ -144,6 +158,7 @@ class TestExpectationTypes:
         """Test Coexistence Modularity (CM) expectation."""
         ls, communities = simple_linkstream_and_communities
         result = longitudinal_modularity(ls, communities, lex=LexType.CM)
+        print(f"\n  [CM] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
         assert result.lex == LexType.CM
 
@@ -155,6 +170,7 @@ class TestExpectationTypes:
 
         with pytest.raises(ValueError):
             longitudinal_modularity(ls, communities, lex="INVALID")  # type: ignore
+        print("\n  [invalid_lex] ValueError raised as expected")
 
     def test_different_expectation_types_give_different_results(
         self, simple_linkstream_and_communities
@@ -165,6 +181,8 @@ class TestExpectationTypes:
         result_mm = longitudinal_modularity(ls, communities, lex=LexType.MM)
         result_jm = longitudinal_modularity(ls, communities, lex=LexType.JM)
         result_cm = longitudinal_modularity(ls, communities, lex=LexType.CM)
+
+        print(f"\n  [compare_lex] MM={result_mm.value}, JM={result_jm.value}, CM={result_cm.value}")
 
         # All should be ModularityResult
         assert all(isinstance(r, ModularityResult) for r in [result_mm, result_jm, result_cm])
@@ -206,6 +224,10 @@ class TestParameters:
         result_gamma_1 = longitudinal_modularity(ls, communities, gamma=1.0)
         result_gamma_2 = longitudinal_modularity(ls, communities, gamma=2.0)
 
+        print(
+            f"\n  [gamma] gamma=1.0 -> {result_gamma_1.value}, gamma=2.0 -> {result_gamma_2.value}"
+        )
+
         # Different alpha should give different results
         assert result_gamma_1.value != result_gamma_2.value
 
@@ -215,6 +237,10 @@ class TestParameters:
 
         result_omega_1 = longitudinal_modularity(ls, communities, omega=1.0)
         result_omega_2 = longitudinal_modularity(ls, communities, omega=2.0)
+
+        print(
+            f"\n  [omega] omega=1.0 -> penalty={result_omega_1.time_penalty}, omega=2.0 -> penalty={result_omega_2.time_penalty}"
+        )
 
         # Both should be ModularityResult with time_penalty attribute
         assert isinstance(result_omega_1.time_penalty, float)
@@ -227,6 +253,8 @@ class TestParameters:
         result_5 = longitudinal_modularity(ls, communities, ndigits=5)
         result_2 = longitudinal_modularity(ls, communities, ndigits=2)
 
+        print(f"\n  [ndigits] ndigits=5 -> {result_5.value}, ndigits=2 -> {result_2.value}")
+
         # Check that rounding works
         assert result_5.ndigits == 5
         assert result_2.ndigits == 2
@@ -237,6 +265,8 @@ class TestParameters:
 
         result = longitudinal_modularity(ls, communities)
 
+        print(f"\n  [has_time_penalty] value={result.value}, time_penalty={result.time_penalty}")
+
         assert isinstance(result, ModularityResult)
         assert hasattr(result, "time_penalty")
         assert isinstance(result.time_penalty, float)
@@ -246,6 +276,8 @@ class TestParameters:
         ls, communities = basic_setup
 
         result = longitudinal_modularity(ls, communities)
+
+        print(f"\n  [has_lex_type] lex={result.lex} (default should be MM)")
 
         assert isinstance(result, ModularityResult)
         assert result.lex == LexType.MM  # Default
@@ -277,6 +309,7 @@ class TestDirectedLinkStream:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(f"\n  [directed_two_comm] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
 
     def test_directed_all_expectation_types(self) -> None:
@@ -293,6 +326,9 @@ class TestDirectedLinkStream:
 
         for lex_type in [LexType.MM, LexType.JM, LexType.CM]:
             result = longitudinal_modularity(ls, communities, lex=lex_type)
+            print(
+                f"\n  [directed_{lex_type.name}] value={result.value}, time_penalty={result.time_penalty}"
+            )
             assert isinstance(result, ModularityResult)
 
 
@@ -333,6 +369,13 @@ class TestTemporalBehavior:
         result_stable = longitudinal_modularity(ls, communities_stable)
         result_switch = longitudinal_modularity(ls, communities_switch)
 
+        print(
+            f"\n  [community_switches] stable: value={result_stable.value}, penalty={result_stable.time_penalty}"
+        )
+        print(
+            f"  [community_switches] switch: value={result_switch.value}, penalty={result_switch.time_penalty}"
+        )
+
         # Stable should have less penalty (time penalty is negative)
         assert result_stable.time_penalty >= result_switch.time_penalty
 
@@ -357,6 +400,7 @@ class TestTemporalBehavior:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(f"\n  [multiple_timesteps] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
         assert result.value > 0  # Good separation
 
@@ -376,6 +420,7 @@ class TestEdgeCases:
         communities = {"single": {(0, 0), (1, 0)}}
 
         result = longitudinal_modularity(ls, communities)
+        print(f"\n  [single_edge] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
 
     def test_single_node_community(self) -> None:
@@ -393,6 +438,7 @@ class TestEdgeCases:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(f"\n  [single_node_comm] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
 
     def test_weighted_edges(self) -> None:
@@ -408,6 +454,7 @@ class TestEdgeCases:
         communities = {"all": {(0, 0), (1, 0), (2, 0)}}
 
         result = longitudinal_modularity(ls, communities)
+        print(f"\n  [weighted_edges] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
 
     def test_inactive_time_nodes_ignored(self) -> None:
@@ -426,6 +473,7 @@ class TestEdgeCases:
 
         # Should not raise, should ignore inactive nodes
         result = longitudinal_modularity(ls, communities)
+        print(f"\n  [inactive_nodes] value={result.value}, time_penalty={result.time_penalty}")
         assert isinstance(result, ModularityResult)
 
 
@@ -460,6 +508,10 @@ class TestConsistency:
         result2 = longitudinal_modularity(ls, communities)
         result3 = longitudinal_modularity(ls, communities)
 
+        print(
+            f"\n  [deterministic] run1={result1.value}, run2={result2.value}, run3={result3.value}"
+        )
+
         assert result1.value == result2.value == result3.value
 
     def test_multiple_calls_same_linkstream(self) -> None:
@@ -483,6 +535,10 @@ class TestConsistency:
         result2 = longitudinal_modularity(ls, communities2)
         result1b = longitudinal_modularity(ls, communities1)
 
+        print(
+            f"\n  [multiple_calls] comm1_first={result1a.value}, comm2={result2.value}, comm1_second={result1b.value}"
+        )
+
         # First call with communities1 should equal third call
         assert result1a.value == result1b.value
 
@@ -503,6 +559,10 @@ class TestModularityResult:
 
         result = longitudinal_modularity(ls, communities)
 
+        print(
+            f"\n  [result_attrs] value={result.value}, time_penalty={result.time_penalty}, lex={result.lex}, ndigits={result.ndigits}"
+        )
+
         assert hasattr(result, "value")
         assert hasattr(result, "time_penalty")
         assert hasattr(result, "lex")
@@ -518,6 +578,9 @@ class TestModularityResult:
 
         # modularity_without_penalty = value - time_penalty
         expected = round(result.value - result.time_penalty, result.ndigits)
+        print(
+            f"\n  [without_penalty] value={result.value}, time_penalty={result.time_penalty}, modularity_without_penalty={result.modularity_without_penalty}, expected={expected}"
+        )
         assert result.modularity_without_penalty == expected
 
 
@@ -545,6 +608,9 @@ class TestIntegration:
         }
 
         result = longitudinal_modularity(ls, communities)
+        print(
+            f"\n  [from_file] value={result.value}, time_penalty={result.time_penalty}, lex={result.lex}"
+        )
         assert isinstance(result, ModularityResult)
 
 
@@ -578,15 +644,13 @@ class TestSpecificModularityValues:
         }
 
         # Test with JM expectation
-        result_jm = longitudinal_modularity(
-            ls, modules, lex=LexType.JM, omega=0, gamma=1
-        )
+        result_jm = longitudinal_modularity(ls, modules, lex=LexType.JM, omega=0, gamma=1)
+        print(f"\n  [dir_two_mod_JM] value={result_jm.value} (expected -0.08)")
         assert result_jm.value == -0.08
 
         # Test with MM expectation (should give same result)
-        result_mm = longitudinal_modularity(
-            ls, modules, lex=LexType.MM, omega=0, gamma=1
-        )
+        result_mm = longitudinal_modularity(ls, modules, lex=LexType.MM, omega=0, gamma=1)
+        print(f"  [dir_two_mod_MM] value={result_mm.value} (expected -0.08)")
         assert result_mm.value == -0.08
 
     def test_directed_single_module_jm_and_mm(self, cycle_links) -> None:
@@ -599,15 +663,13 @@ class TestSpecificModularityValues:
         }
 
         # Test with JM expectation
-        result_jm = longitudinal_modularity(
-            ls, modules, lex=LexType.JM, omega=0, gamma=1
-        )
+        result_jm = longitudinal_modularity(ls, modules, lex=LexType.JM, omega=0, gamma=1)
+        print(f"\n  [dir_single_mod_JM] value={result_jm.value} (expected 0)")
         assert result_jm.value == 0
 
         # Test with MM expectation (should give same result)
-        result_mm = longitudinal_modularity(
-            ls, modules, lex=LexType.MM, omega=0, gamma=1
-        )
+        result_mm = longitudinal_modularity(ls, modules, lex=LexType.MM, omega=0, gamma=1)
+        print(f"  [dir_single_mod_MM] value={result_mm.value} (expected 0)")
         assert result_mm.value == 0
 
     def test_directed_singleton_modules_jm_and_mm(self, cycle_links) -> None:
@@ -623,15 +685,13 @@ class TestSpecificModularityValues:
         }
 
         # Test with JM expectation
-        result_jm = longitudinal_modularity(
-            ls, modules, lex=LexType.JM, omega=0, gamma=1
-        )
+        result_jm = longitudinal_modularity(ls, modules, lex=LexType.JM, omega=0, gamma=1)
+        print(f"\n  [dir_singleton_JM] value={result_jm.value} (expected -0.24)")
         assert result_jm.value == -0.24
 
         # Test with MM expectation (should give same result)
-        result_mm = longitudinal_modularity(
-            ls, modules, lex=LexType.MM, omega=0, gamma=1
-        )
+        result_mm = longitudinal_modularity(ls, modules, lex=LexType.MM, omega=0, gamma=1)
+        print(f"  [dir_singleton_MM] value={result_mm.value} (expected -0.24)")
         assert result_mm.value == -0.24
 
     def test_undirected_two_modules_jm_and_mm(self, cycle_links) -> None:
@@ -645,15 +705,13 @@ class TestSpecificModularityValues:
         }
 
         # Test with JM expectation
-        result_jm = longitudinal_modularity(
-            ls, modules, lex=LexType.JM, omega=0, gamma=1
-        )
+        result_jm = longitudinal_modularity(ls, modules, lex=LexType.JM, omega=0, gamma=1)
+        print(f"\n  [undir_two_mod_JM] value={result_jm.value} (expected -0.1)")
         assert result_jm.value == -0.1
 
         # Test with MM expectation (should give same result)
-        result_mm = longitudinal_modularity(
-            ls, modules, lex=LexType.MM, omega=0, gamma=1
-        )
+        result_mm = longitudinal_modularity(ls, modules, lex=LexType.MM, omega=0, gamma=1)
+        print(f"  [undir_two_mod_MM] value={result_mm.value} (expected -0.1)")
         assert result_mm.value == -0.1
 
     def test_undirected_single_module_jm_and_mm(self, cycle_links) -> None:
@@ -666,15 +724,13 @@ class TestSpecificModularityValues:
         }
 
         # Test with JM expectation
-        result_jm = longitudinal_modularity(
-            ls, modules, lex=LexType.JM, omega=0, gamma=1
-        )
+        result_jm = longitudinal_modularity(ls, modules, lex=LexType.JM, omega=0, gamma=1)
+        print(f"\n  [undir_single_mod_JM] value={result_jm.value} (expected 0)")
         assert result_jm.value == 0
 
         # Test with MM expectation (should give same result)
-        result_mm = longitudinal_modularity(
-            ls, modules, lex=LexType.MM, omega=0, gamma=1
-        )
+        result_mm = longitudinal_modularity(ls, modules, lex=LexType.MM, omega=0, gamma=1)
+        print(f"  [undir_single_mod_MM] value={result_mm.value} (expected 0)")
         assert result_mm.value == 0
 
     def test_undirected_singleton_modules_jm_and_mm(self, cycle_links) -> None:
@@ -690,15 +746,13 @@ class TestSpecificModularityValues:
         }
 
         # Test with JM expectation
-        result_jm = longitudinal_modularity(
-            ls, modules, lex=LexType.JM, omega=0, gamma=1
-        )
+        result_jm = longitudinal_modularity(ls, modules, lex=LexType.JM, omega=0, gamma=1)
+        print(f"\n  [undir_singleton_JM] value={result_jm.value} (expected -0.26)")
         assert result_jm.value == -0.26
 
         # Test with MM expectation (should give same result)
-        result_mm = longitudinal_modularity(
-            ls, modules, lex=LexType.MM, omega=0, gamma=1
-        )
+        result_mm = longitudinal_modularity(ls, modules, lex=LexType.MM, omega=0, gamma=1)
+        print(f"  [undir_singleton_MM] value={result_mm.value} (expected -0.26)")
         assert result_mm.value == -0.26
 
 
@@ -806,6 +860,10 @@ class TestStaticVsLongitudinalEquivalence:
             ls, modules_ground_truth, lex=LexType.JM, omega=0, gamma=1
         )
 
+        print(
+            f"\n  [static_vs_long_3comm] Q_static={Q_static:.10f}, longitudinal={lm_result.value:.10f}, diff={abs(Q_static - lm_result.value):.2e}"
+        )
+
         # They should match within 1e-5 precision
         assert abs(Q_static - lm_result.value) < 1e-5, (
             f"Static Q ({Q_static:.10f}) != Longitudinal Mod ({lm_result.value:.10f})"
@@ -838,8 +896,10 @@ class TestStaticVsLongitudinalEquivalence:
         # Single module
         modules_single = {0: {(node, 0) for node in range(n)}}
 
-        lm_result = longitudinal_modularity(
-            ls, modules_single, lex=LexType.JM, omega=0, gamma=1
+        lm_result = longitudinal_modularity(ls, modules_single, lex=LexType.JM, omega=0, gamma=1)
+
+        print(
+            f"\n  [static_vs_long_single] Q_static={Q_static:.10f}, longitudinal={lm_result.value:.10f}, diff={abs(Q_static - lm_result.value):.2e}"
         )
 
         assert abs(Q_static - lm_result.value) < 1e-5
@@ -861,9 +921,7 @@ class TestStaticVsLongitudinalEquivalence:
         k_out = A.sum(axis=1)
         k_in = A.sum(axis=0)
         m = int(A.sum())
-        Q_static, _, _ = self.compute_directed_modularity(
-            A, communities_individual, k_out, k_in, m
-        )
+        Q_static, _, _ = self.compute_directed_modularity(A, communities_individual, k_out, k_in, m)
 
         # Convert to LinkStream
         links = [[i, j, 0] for i in range(n) for j in range(n) if A[i, j] == 1]
@@ -875,6 +933,10 @@ class TestStaticVsLongitudinalEquivalence:
 
         lm_result = longitudinal_modularity(
             ls, modules_individual, lex=LexType.JM, omega=0, gamma=1
+        )
+
+        print(
+            f"\n  [static_vs_long_individual] Q_static={Q_static:.10f}, longitudinal={lm_result.value:.10f}, diff={abs(Q_static - lm_result.value):.2e}"
         )
 
         assert abs(Q_static - lm_result.value) < 1e-5
@@ -895,36 +957,193 @@ class TestStaticVsLongitudinalEquivalence:
         ls = LinkStream(directed=True)
         ls.add_links(links)
 
-        # Run LAGO to find modules
-        modules_lago = lago_modules(
-            ls,
-            lex=LexType.JM,
-            omega=0,
-            gamma=1,
-            refinement_in=True,
-            refinement="STNM",
-            nb_iter=1,
-            verbose=False,
+        adj: dict[int, list[int]] = {}
+        for i, j, _t in links:
+            adj.setdefault(i, []).append(j)
+        links_str = "\n".join(
+            f"    {src}: {', '.join(map(str, tgts))}" for src, tgts in sorted(adj.items())
         )
 
-        # Compute longitudinal modularity for LAGO result
-        lm_lago = longitudinal_modularity(
-            ls, modules_lago, lex=LexType.JM, omega=0, gamma=1
-        )
-
-        # Convert LAGO modules to static communities array
-        communities_lago = np.zeros(n, dtype=int)
-        for module_id, nodes_dict in modules_lago.get_time_modules_dict().items():
-            for node in nodes_dict.keys():
-                communities_lago[node] = module_id
-
-        # Compute static modularity for LAGO result
         k_out = A.sum(axis=1)
         k_in = A.sum(axis=0)
         m = int(A.sum())
-        Q_lago, _, _ = self.compute_directed_modularity(A, communities_lago, k_out, k_in, m)
 
-        # Static Q should equal longitudinal modularity within 1e-5 precision
-        assert abs(Q_lago - lm_lago.value) < 1e-5, (
-            f"Static Q ({Q_lago:.10f}) != Longitudinal Mod ({lm_lago.value:.10f})"
+        # --- Ground truth communities (3 communities: nodes 0-3, 4-7, 8-11) ---
+        communities_ground_truth = np.array([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2])
+        modules_ground_truth = {}
+        for node, comm in enumerate(communities_ground_truth):
+            if comm not in modules_ground_truth:
+                modules_ground_truth[comm] = set()
+            modules_ground_truth[comm].add((node, 0))
+
+        Q_gt, _, _ = self.compute_directed_modularity(A, communities_ground_truth, k_out, k_in, m)
+
+        for lex_type in [LexType.JM, LexType.MM]:
+            lm_gt = longitudinal_modularity(
+                ls, modules_ground_truth, lex=lex_type, omega=0, gamma=1
+            )
+            print(
+                f"\n  [static_vs_gt_{lex_type.name}] Q_static={Q_gt:.10f}, longitudinal={lm_gt.value:.10f}, diff={abs(Q_gt - lm_gt.value):.2e}"
+            )
+            assert abs(Q_gt - lm_gt.value) < 1e-5, (
+                f"Ground truth {lex_type.name}: Static Q ({Q_gt:.10f}) != Longitudinal Mod ({lm_gt.value:.10f})\n"
+                f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
+            )
+
+        # --- LAGO-detected modules ---
+        for lex_type in [LexType.JM, LexType.MM]:
+            modules_lago = lago_modules(
+                ls,
+                lex=lex_type,
+                omega=0,
+                gamma=1,
+                refinement_in=True,
+                refinement="STNM",
+                nb_iter=1,
+                verbose=False,
+            )
+
+            # Compute longitudinal modularity for LAGO result
+            lm_lago = longitudinal_modularity(ls, modules_lago, lex=lex_type, omega=0, gamma=1)
+
+            # Convert LAGO modules to static communities array
+            communities_lago = np.zeros(n, dtype=int)
+            for module_id, nodes_dict in modules_lago.get_time_modules_dict().items():
+                for node in nodes_dict:
+                    communities_lago[node] = module_id
+
+            Q_lago, _, _ = self.compute_directed_modularity(A, communities_lago, k_out, k_in, m)
+
+            print(
+                f"\n  [static_vs_lago_{lex_type.name}] Q_static={Q_lago:.10f}, longitudinal={lm_lago.value:.10f}, diff={abs(Q_lago - lm_lago.value):.2e}"
+            )
+            print(
+                f"  [static_vs_lago_{lex_type.name}] LAGO found {len(modules_lago.get_time_modules_dict())} modules"
+            )
+
+            # Static Q should equal longitudinal modularity within 1e-5 precision
+            assert abs(Q_lago - lm_lago.value) < 1e-5, (
+                f"LAGO {lex_type.name}: Static Q ({Q_lago:.10f}) != Longitudinal Mod ({lm_lago.value:.10f})\n"
+                f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
+            )
+
+            # LAGO-detected modules should have modularity >= ground truth
+            n_lago = len(modules_lago.get_time_modules_dict())
+            n_gt = len(modules_ground_truth)
+            print(
+                f"  [static_vs_lago_{lex_type.name}] Q_lago={Q_lago:.10f} ({n_lago} modules), Q_gt={Q_gt:.10f} ({n_gt} modules), lm_lago={lm_lago.value:.10f}"
+            )
+            assert Q_lago >= Q_gt - 1e-5, (
+                f"LAGO {lex_type.name}: Q_lago ({Q_lago:.10f}, {n_lago} modules) < Q_gt ({Q_gt:.10f}, {n_gt} modules), lm_lago={lm_lago.value:.10f}\n"
+                f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
+            )
+
+    def test_static_vs_longitudinal_with_lago_modules_large(self) -> None:
+        """Test LAGO modules on a larger network (24 nodes, 4 communities of 6)."""
+        n = 24
+        n_communities = 4
+        community_size = n // n_communities
+        A = np.zeros((n, n), dtype=int)
+
+        # Intra-community edges (chain + a few extra, not fully connected)
+        for c in range(n_communities):
+            start = c * community_size
+            # Chain: 0->1->2->3->4->5->0
+            for k in range(community_size):
+                A[start + k, start + (k + 1) % community_size] = 1
+            # Extra edges for density: 0->2, 1->3, 2->4, 3->5
+            for k in range(community_size):
+                A[start + k, start + (k + 2) % community_size] = 1
+            # A couple more: 0->3, 1->4
+            A[start, start + 3] = 1
+            A[start + 1, start + 4] = 1
+
+        # Inter-community edges (ring between adjacent communities, ~4 edges each)
+        for c in range(n_communities):
+            c_next = (c + 1) % n_communities
+            start_c = c * community_size
+            start_next = c_next * community_size
+            # 4 directed edges from community c to community c+1
+            A[start_c + community_size - 1, start_next] = 1
+            A[start_c + community_size - 2, start_next + 1] = 1
+            A[start_c + community_size - 3, start_next + 2] = 1
+            A[start_c, start_next + community_size - 1] = 1
+
+        # Ground truth communities
+        communities_ground_truth = np.array([i // community_size for i in range(n)])
+        modules_ground_truth = {}
+        for node, comm in enumerate(communities_ground_truth):
+            if comm not in modules_ground_truth:
+                modules_ground_truth[comm] = set()
+            modules_ground_truth[comm].add((node, 0))
+
+        # Convert to LinkStream
+        links = [[i, j, 0] for i in range(n) for j in range(n) if A[i, j] == 1]
+        ls = LinkStream(directed=True)
+        ls.add_links(links)
+
+        adj: dict[int, list[int]] = {}
+        for i, j, _t in links:
+            adj.setdefault(i, []).append(j)
+        links_str = "\n".join(
+            f"    {src}: {', '.join(map(str, tgts))}" for src, tgts in sorted(adj.items())
         )
+
+        k_out = A.sum(axis=1)
+        k_in = A.sum(axis=0)
+        m = int(A.sum())
+
+        Q_gt, _, _ = self.compute_directed_modularity(A, communities_ground_truth, k_out, k_in, m)
+
+        for lex_type in [LexType.JM, LexType.MM]:
+            # Verify ground truth equivalence
+            lm_gt = longitudinal_modularity(
+                ls, modules_ground_truth, lex=lex_type, omega=0, gamma=1
+            )
+            print(
+                f"\n  [large_gt_{lex_type.name}] Q_gt={Q_gt:.10f}, lm_gt={lm_gt.value:.10f}, diff={abs(Q_gt - lm_gt.value):.2e}"
+            )
+            assert abs(Q_gt - lm_gt.value) < 1e-5, (
+                f"Large GT {lex_type.name}: Static Q ({Q_gt:.10f}) != Longitudinal Mod ({lm_gt.value:.10f})\n"
+                f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
+            )
+
+            # Run LAGO
+            modules_lago = lago_modules(
+                ls,
+                lex=lex_type,
+                omega=0,
+                gamma=1,
+                refinement_in=True,
+                refinement="STNM",
+                nb_iter=1,
+                verbose=False,
+            )
+
+            lm_lago = longitudinal_modularity(ls, modules_lago, lex=lex_type, omega=0, gamma=1)
+
+            # Convert LAGO modules to static communities array
+            communities_lago = np.zeros(n, dtype=int)
+            for module_id, nodes_dict in modules_lago.get_time_modules_dict().items():
+                for node in nodes_dict:
+                    communities_lago[node] = module_id
+
+            Q_lago, _, _ = self.compute_directed_modularity(A, communities_lago, k_out, k_in, m)
+
+            n_lago = len(modules_lago.get_time_modules_dict())
+            n_gt = len(modules_ground_truth)
+            print(
+                f"\n  [large_lago_{lex_type.name}] Q_lago={Q_lago:.10f} ({n_lago} modules), Q_gt={Q_gt:.10f} ({n_gt} modules), lm_lago={lm_lago.value:.10f}, lm_gt={lm_gt.value:.10f}"
+            )
+
+            # Static Q should equal longitudinal modularity
+            assert abs(Q_lago - lm_lago.value) < 1e-5, (
+                f"Large LAGO {lex_type.name}: Static Q ({Q_lago:.10f}) != Longitudinal Mod ({lm_lago.value:.10f})\n"
+                f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
+            )
+
+            # LAGO should achieve modularity >= ground truth
+            assert Q_lago >= Q_gt - 1e-5, (
+                f"Large LAGO {lex_type.name}: Q_lago ({Q_lago:.10f}, {n_lago} modules) < Q_gt ({Q_gt:.10f}, {n_gt} modules), lm_lago={lm_lago.value:.10f}, lm_gt={lm_gt.value:.10f}\n"
+                f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
+            )

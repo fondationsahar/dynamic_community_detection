@@ -47,7 +47,9 @@ class DeltaLongitudinalModularityComputer:
             float: Δ L-Modularity of the movement
         """
 
-        weight_diff = 2 * self._get_weight_diff(M0_leaves, Mx_leaves)
+        weight_diff = self._get_weight_diff(M0_leaves, Mx_leaves)
+        if not self.linkstream.directed:
+            weight_diff *= 2
 
         if self.lex == "MM":
             expectation_diff = self._get_expectation_mm_part(
@@ -56,7 +58,6 @@ class DeltaLongitudinalModularityComputer:
                 partite_mapping,
             )
         elif self.lex == "JM":
-            # TODO Ensure compatibility with the continuous setting
             expectation_diff = self._get_expectation_jm_part(
                 M0_leaves,
                 Mx_leaves,
@@ -89,14 +90,15 @@ class DeltaLongitudinalModularityComputer:
         """
         all_neighbs = list()
         for leaf in Mx_leaves:
-            all_neighbs += list([neighb for neighb in leaf.topo_neighbors])
+            all_neighbs += list(
+                [neighb for neighb in leaf.topo_neighbors | leaf.topo_neighbors_from]
+            )
 
         # Only keep inventoried neighbors that are in M0
         # Note: cannot use a set here because we want to keep duplicated time nodes
         neighbors_weights = [
             neighb.weight * neighb.duration for neighb in all_neighbs if neighb.target in M0_leaves
         ]
-
         return sum(neighbors_weights)
 
     def _get_csc_diff(self, M0_time_segments, Mx_leaves) -> float:
@@ -173,6 +175,11 @@ class DeltaLongitudinalModularityComputer:
                 degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
                 - degree_in_Cx * degree_out_Cx * duration_Cx
             ) / (2 * self.linkstream.weight * self.linkstream.network_duration)
+            # expectation_diff = 0
+            # expectation_diff = (
+            #     degree_in_Cx_U_C0 * degree_out_Cx_U_C0 * duration_Cx_U_C0
+            #     - degree_in_Cx * degree_out_Cx * duration_Cx
+            # ) / (2 * self.linkstream.weight * self.linkstream.network_duration)
         else:
             degree_Cx = self._sum_degrees(Mx_leaves)
             degree_Cx_U_C0 = self._sum_degrees(Mx_leaves | M0_leaves)

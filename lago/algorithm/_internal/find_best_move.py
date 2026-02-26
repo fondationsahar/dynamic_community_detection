@@ -4,7 +4,7 @@ from .delta_lm import (
     DeltaLongitudinalModularityComputer,
 )
 
-# Global counters for tracking (only used when verbose >= 3)
+# Global counters for tracking (only used when verbose >= 4)
 _find_best_stats = {
     "calls": 0,
     "no_modules": 0,
@@ -82,6 +82,8 @@ def find_best_module_for_submodule(
 
     M1_leaves = submodule.parent.leaves - M0_leaves
 
+    # NOTE maybe could be optimized because if M1_leaves is empty
+    # no computing is needed. Check that.
     delta_lm_M0_leaving_M1 = -delta_lm_computer.M0_to_Mx(
         M0_leaves=M0_leaves,
         M0_time_segments=M0_time_segments,
@@ -114,9 +116,30 @@ def find_best_module_for_submodule(
     if delta_lm <= stopping_criterion:
         # No move improves LM beyond stopping criterion, continue exploring...
         _find_best_stats["no_improvement"] += 1
+        if verbose >= 4:
+            m0_nodes = sorted({leaf.node for leaf in M0_leaves})
+            print(
+                f"    [find_best] submodule nodes={m0_nodes}, delta_leaving={delta_lm_M0_leaving_M1:.6f}"
+            )
+            for mod, dlm in sorted(candidates_delta_lm.items(), key=lambda x: x[1], reverse=True):
+                mod_nodes = sorted({leaf.node for leaf in mod.leaves})
+                print(
+                    f"      candidate {mod_nodes}: delta_lm={dlm:.6f} (rejected, <= {stopping_criterion})"
+                )
         return None, None
 
     best_module = [module for module, dlm in candidates_delta_lm.items() if dlm == delta_lm][0]
     _find_best_stats["success"] += 1
+
+    if verbose >= 4:
+        m0_nodes = sorted({leaf.node for leaf in M0_leaves})
+        m1_nodes = sorted({leaf.node for leaf in M1_leaves})
+        print(
+            f"    [find_best] submodule nodes={m0_nodes}, parent(remaining)={m1_nodes}, delta_leaving={delta_lm_M0_leaving_M1:.6f}"
+        )
+        for mod, dlm in sorted(candidates_delta_lm.items(), key=lambda x: x[1], reverse=True):
+            mod_nodes = sorted({leaf.node for leaf in mod.leaves})
+            marker = " <-- best" if mod is best_module else ""
+            print(f"      candidate {mod_nodes}: delta_lm={dlm:.6f}{marker}")
 
     return best_module, delta_lm

@@ -226,6 +226,7 @@ class LongitudinalModulesPlot:
         # Computed data (populated during _prepare_data)
         self._nodes_mapping: NodesMapping | None = None
         self._remapped_modules: Modules | None = None
+        self._remapped_node_focus: list[Any] = []
         self._time_links: TimeLinks | None = None
         self._focused_modules: Modules | None = None  # Primary: specified modules
         self._secondary_modules: Modules | None = None  # Secondary: big ones, less visible
@@ -1573,6 +1574,7 @@ class LongitudinalModulesPlot:
             ]
         else:
             remapped_node_focus = []
+        self._remapped_node_focus = remapped_node_focus
 
         # Store the final nodes_to_display list with mapped indices
         # Only include nodes that are in the mapping
@@ -1864,7 +1866,7 @@ class LongitudinalModulesPlot:
                     self._start_nodes,
                     self._end_nodes,
                     self.node_alpha,
-                    self.node_focus,
+                    self._remapped_node_focus,
                     self.highlight_node_focus,
                     self.node_linewidth,
                     self.node_linewidth_focus,

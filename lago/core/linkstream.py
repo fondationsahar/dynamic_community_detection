@@ -337,6 +337,7 @@ class LinkStream:
         Args:
             links: Sequence of link tuples.
         """
+        # TODO Check if overlapping continuous interactions are treated correctly
         warnings.warn(
             "add_continuous_links is deprecated, use add_links instead with continuous=True mode",
             DeprecationWarning,

@@ -117,6 +117,9 @@ def lago_modules(
         linkstream_copy.add_links(list(raw_links))
         linkstream_copy._split_continuous_linkstream()
         linkstream = linkstream_copy
+        # Overwrite the artificial number of edges
+        # resulting from segmentation phase
+        linkstream.nb_edges = len(raw_links)
 
     # Log start info
     log_info(

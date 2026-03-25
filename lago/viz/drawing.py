@@ -347,7 +347,7 @@ def draw_edges(
         ax: Matplotlib axes
         time_links: List of edge tuples. Format depends on linkstream type:
             - Regular: (source, target, time, weight)
-            - Continuous: (source, target, start_time, end_time, weight)
+            - Continuous: (source, target, start_time, duration, weight)
         time_node_module_mapping: Mapping from (node, time) to module
         color_mapping: Color mapping for modules
         edge_alpha: Transparency for edges
@@ -361,11 +361,10 @@ def draw_edges(
     """
     for link in time_links:
         if is_continuous:
-            # Continuous linkstreams have: (source, target, start_time, end_time[, weight])
+            # Continuous linkstreams have: (source, target, start_time, duration[, weight])
             source, target, start_time = link[0], link[1], link[2]
-            end_time = link[3] if len(link) > 3 else start_time + 1
-            # Weight is normalized to 1.0 for continuous linkstreams
-            time = (start_time + end_time) // 2  # Use midpoint for drawing
+            duration = link[3] if len(link) > 3 else 1
+            time = start_time  # Draw arc at start time (like an instantaneous edge)
         else:
             # Regular linkstreams have: (source, target, time[, weight])
             source, target, time = link[0], link[1], link[2]
@@ -397,6 +396,117 @@ def draw_edges(
         # Draw arrow head for edge orientation if requested and linkstream is directed
         if show_edge_orientation and is_directed:
             draw_arrow_head(ax, center1, center2, "black", edge_alpha, linewidth)
+
+
+def draw_continuous_duration_lines(
+    ax: Axes,
+    time_links: list,
+    time_node_module_mapping: dict,
+    color_mapping: dict,
+    edge_alpha: float,
+    color_edges: bool,
+    edge_flatten_factor: float,
+    is_directed: bool = False,
+    linewidth: float = 1.0,
+):
+    """
+    Draw horizontal lines showing the duration of continuous edges.
+
+    For each continuous link, draws a horizontal line starting where the arc
+    curve passes at the line's y-level and extending rightward for a length
+    equal to the link's duration. The line is positioned slightly above the
+    vertical midpoint between the two connected nodes, with a small random
+    y-jitter to reduce overlap.
+
+    Args:
+        ax: Matplotlib axes
+        time_links: List of (source, target, start_time, duration[, weight]) tuples.
+        time_node_module_mapping: Mapping from (node, time) to module
+        color_mapping: Color mapping for modules
+        edge_alpha: Base transparency for edges
+        color_edges: Whether to color lines by module
+        edge_flatten_factor: Flattening factor for edge arcs (must match draw_edges).
+        is_directed: Whether the linkstream is directed
+        linewidth: Line width in points. Default 1.0.
+    """
+    import numpy as np
+    from matplotlib.collections import LineCollection
+
+    rng = np.random.default_rng(42)
+
+    segments = []
+    colors = []
+    seen_edges: set = set()
+
+    for link in time_links:
+        source, target, start_time = link[0], link[1], link[2]
+        duration = link[3] if len(link) > 3 else 1
+
+        node1, node2 = source, target
+        if not is_directed:
+            node1, node2 = sorted([node1, node2])
+            edge_key = (node1, node2, start_time, duration)
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+
+        # Arc center x (arc drawn at start_time)
+        time = start_time
+        arc_x = time + 0.5
+
+        # Arc geometry (must match create_edge_arc / draw_edges)
+        node_dist = abs(node2 - node1)
+        arc_semi_w = (node_dist ** 0.5 * 0.9 * edge_flatten_factor) / 2  # half-width in x
+        arc_semi_h = node_dist / 2  # half-height in y
+
+        # Vertical midpoint between the two node centers, slightly above
+        # with random jitter to reduce overlap between co-located edges
+        y_mid = (node1 + node2 + 1) / 2
+        jitter = rng.uniform(-0.15, 0.15)
+        y = y_mid + 0.08 + jitter
+
+        # Compute where the arc curve intersects this y-level.
+        # The arc is the left half of an ellipse centered at (arc_x, y_mid).
+        # Ellipse: ((x - arc_x)/arc_semi_w)^2 + ((y - y_mid)/arc_semi_h)^2 = 1
+        # Solving for x on the left half: x = arc_x - arc_semi_w * sqrt(1 - t^2)
+        dy_ratio = (y - y_mid) / arc_semi_h if arc_semi_h > 0 else 0
+        t2 = 1 - dy_ratio ** 2
+        if t2 > 0:
+            # Right side of the arc at this y-level
+            x_start = arc_x + arc_semi_w * np.sqrt(t2)
+        else:
+            x_start = arc_x
+
+        x_end = arc_x + duration
+
+        # Resolve color (same logic as _draw_edge_common)
+        color = "black"
+        if color_edges:
+            source_module = time_node_module_mapping.get((source, time))
+            target_module = time_node_module_mapping.get((target, time))
+            if (
+                source_module is not None
+                and source_module == target_module
+            ):
+                c = color_mapping.get(source_module)
+                if c is not None and not (isinstance(c, str) and c == "gainsboro"):
+                    color = c
+
+        segments.append([(x_start, y), (x_end, y)])
+        # Small vertical tick at the end
+        tick_half = 0.06
+        segments.append([(x_end, y - tick_half), (x_end, y + tick_half)])
+        colors.append(color)
+        colors.append(color)
+
+    if segments:
+        lc = LineCollection(
+            segments,
+            colors=colors,
+            alpha=edge_alpha,
+            linewidths=linewidth / 2,
+        )
+        ax.add_collection(lc)
 
 
 def draw_edges_delayed(

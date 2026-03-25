@@ -44,6 +44,7 @@ from .data_preparation import (
     prepare_modules_for_display,
 )
 from .drawing import (
+    draw_continuous_duration_lines,
     draw_edge_activity,
     draw_edge_activity_delayed,
     draw_edges,
@@ -174,6 +175,7 @@ class LongitudinalModulesPlot:
         self.edge_linewidth: float = 1.0  # Edge line width in points
         self.edge_curve_intensity: float = 0.0  # Curve intensity (positive=right, negative=left)
         self.show_edge_orientation: bool = False
+        self.show_continuous_duration: bool = False
         self.color_palette: str | Sequence[Any] = "tab10"
 
         # Label settings
@@ -1080,6 +1082,7 @@ class LongitudinalModulesPlot:
         activity_width: float = 0.8,
         activity_height: float = 0.4,
         activity_alpha: float | None = None,
+        continuous_duration: bool = False,
     ) -> "LongitudinalModulesPlot":
         """
         Configure all edge-related settings in one call.
@@ -1107,6 +1110,8 @@ class LongitudinalModulesPlot:
             activity_width: Width of edge activity rectangles (0.0 to 1.0).
             activity_height: Height of edge activity rectangles (0.0 to 1.0).
             activity_alpha: Alpha for activity markers. If None, uses edge_alpha.
+            continuous_duration: Whether to show horizontal duration lines for
+                continuous linkstreams. Only has effect when the linkstream is continuous.
 
         Returns:
             Self for method chaining.
@@ -1149,6 +1154,9 @@ class LongitudinalModulesPlot:
             height=activity_height,
             alpha=activity_alpha if activity_alpha is not None else edge_alpha,
         )
+
+        # Continuous duration lines
+        self.show_continuous_duration = continuous_duration
 
         return self
 
@@ -1906,6 +1914,18 @@ class LongitudinalModulesPlot:
                         self.linkstream,
                         self.edge_linewidth,
                     )
+                    if self.show_continuous_duration and self.linkstream.continuous:
+                        draw_continuous_duration_lines(
+                            self._ax,
+                            self._time_links,
+                            self._time_node_module_mapping,
+                            self._color_mapping,
+                            self.edge_alpha,
+                            self.color_edges,
+                            self.edge_flatten_factor,
+                            self.linkstream.directed,
+                            self.edge_linewidth,
+                        )
 
     def _draw_edge_activity(self) -> None:
         """Draw edge activity markers as rectangles."""

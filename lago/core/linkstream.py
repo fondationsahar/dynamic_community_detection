@@ -596,7 +596,7 @@ class LinkStream:
                 tmp_time_instants_sorted = sorted(tmp_time_instants)
 
                 for time_start, time_end in pairwise(tmp_time_instants_sorted):
-                    duration = time_end - time_start
+                    duration = time_end - time_start + 1
                     self._ensure_leaf_exists(node, time_start)
 
                     target_node = time_edge.target.node

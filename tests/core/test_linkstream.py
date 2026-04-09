@@ -693,14 +693,15 @@ class TestFileIO:
         output_file = tmp_path / "roundtrip.txt"
         ls1.to_txt(str(output_file))
 
-        # Read back
-        ls2 = linkstream_factory()
-        ls2.read_txt(str(output_file), columns_order=["source", "target", "time", "weight"])
+        # Read back into a directed linkstream because to_txt writes both
+        # directions of each undirected edge (e.g., "0 1 0" and "1 0 0"),
+        # which would be rejected as duplicates by undirected mode.
+        ls2 = linkstream_factory(directed=True)
+        ls2.read_txt(str(output_file), columns_order=["source", "target", "time"])
 
         # Compare - nb_nodes should be same
         assert ls1.nb_nodes == ls2.nb_nodes
-        # NOTE: nb_edges doubles because undirected edges are written twice
-        # and then read as separate edges. This is a known behavior.
+        # nb_edges doubles because undirected edges are written in both directions
         assert ls2.nb_edges == ls1.nb_edges * 2
 
 
@@ -837,7 +838,153 @@ class TestEdgeCases:
 
 
 # =============================================================================
-# SECTION 10: Integration Tests
+# SECTION 10: Input Validation Tests
+# =============================================================================
+
+
+class TestInputValidation:
+    """Tests for input validation added in code review."""
+
+    # -- Node type validation --
+
+    def test_string_nodes_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """String node IDs should raise TypeError."""
+        ls = linkstream_factory()
+        with pytest.raises(TypeError, match="Node IDs must be integers"):
+            ls.add_links([("a", "b", 0)])
+
+    def test_float_nodes_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Float node IDs should raise TypeError."""
+        ls = linkstream_factory()
+        with pytest.raises(TypeError, match="Node IDs must be integers"):
+            ls.add_links([(0.5, 1.5, 0)])
+
+    # -- Weight validation --
+
+    def test_negative_weight_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Negative weights should raise ValueError."""
+        ls = linkstream_factory()
+        with pytest.raises(ValueError, match="Weight must be >= 0"):
+            ls.add_links([(0, 1, 0, -1)])
+
+    def test_negative_weight_continuous_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Negative weights on continuous links should raise ValueError."""
+        ls = linkstream_factory(continuous=True)
+        with pytest.raises(ValueError, match="Weight must be >= 0"):
+            ls.add_links([(0, 1, 0, 3, -1)])
+
+    # -- Duration validation (continuous mode) --
+
+    def test_zero_duration_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Zero duration in continuous mode should raise ValueError."""
+        ls = linkstream_factory(continuous=True)
+        with pytest.raises(ValueError, match="Duration must be > 0"):
+            ls.add_links([(0, 1, 0, 0)])
+
+    def test_negative_duration_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Negative duration in continuous mode should raise ValueError."""
+        ls = linkstream_factory(continuous=True)
+        with pytest.raises(ValueError, match="Duration must be > 0"):
+            ls.add_links([(0, 1, 0, -3)])
+
+    # -- Undirected duplicate detection with swapped nodes --
+
+    def test_undirected_swapped_duplicate_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """(A,B,t) and (B,A,t) should be detected as duplicates for undirected graphs."""
+        ls = linkstream_factory()
+        with pytest.raises(ValueError, match="Duplicate edge detected"):
+            ls.add_links([(0, 1, 0), (1, 0, 0)])
+
+    def test_directed_swapped_not_duplicate(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """(A,B,t) and (B,A,t) should be allowed for directed graphs."""
+        ls = linkstream_factory(directed=True)
+        ls.add_links([(0, 1, 0), (1, 0, 0)])
+        assert ls.nb_edges == 2
+
+    def test_undirected_continuous_swapped_duplicate_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Swapped node order in continuous undirected mode should be a duplicate."""
+        ls = linkstream_factory(continuous=True)
+        with pytest.raises(ValueError, match="Duplicate edge detected"):
+            ls.add_links([(0, 1, 0, 3), (1, 0, 0, 3)])
+
+    def test_undirected_delayed_swapped_duplicate_rejected(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Swapped node order in delayed undirected mode should be a duplicate."""
+        ls = linkstream_factory(delayed=True)
+        with pytest.raises(ValueError, match="Duplicate edge detected"):
+            ls.add_links([(0, 1, 0, 5), (1, 0, 0, 5)])
+
+
+class TestLagoModulesValidation:
+    """Tests for lago_modules parameter validation."""
+
+    def test_negative_gamma_rejected(self) -> None:
+        """Negative gamma should raise ValueError."""
+        from lago import LinkStream, lago_modules
+
+        ls = LinkStream()
+        ls.add_links([(0, 1, 0)])
+        with pytest.raises(ValueError, match="gamma must be >= 0"):
+            lago_modules(ls, gamma=-1)
+
+    def test_negative_omega_rejected(self) -> None:
+        """Negative omega should raise ValueError."""
+        from lago import LinkStream, lago_modules
+
+        ls = LinkStream()
+        ls.add_links([(0, 1, 0)])
+        with pytest.raises(ValueError, match="omega must be >= 0"):
+            lago_modules(ls, omega=-1)
+
+    def test_zero_nb_iter_rejected(self) -> None:
+        """nb_iter=0 should raise ValueError."""
+        from lago import LinkStream, lago_modules
+
+        ls = LinkStream()
+        ls.add_links([(0, 1, 0)])
+        with pytest.raises(ValueError, match="nb_iter must be >= 1"):
+            lago_modules(ls, nb_iter=0)
+
+    def test_empty_linkstream_rejected(self) -> None:
+        """Empty LinkStream should raise ValueError."""
+        from lago import LinkStream, lago_modules
+
+        ls = LinkStream()
+        with pytest.raises(ValueError, match="LinkStream has no edges"):
+            lago_modules(ls)
+
+
+# =============================================================================
+# SECTION 11: Integration Tests
 # =============================================================================
 
 

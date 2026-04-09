@@ -62,7 +62,7 @@ def find_best_module_for_submodule(
     if modules is None:
         # Get parents of submodule neighbors
         neighbors = submodule.neighbors
-        modules = list(set([module.parent for module in neighbors if module.parent is not None]))
+        modules = list({module.parent for module in neighbors if module.parent is not None})
 
     # Exclude self parent from move options
     if modules and submodule.parent in modules:

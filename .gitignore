@@ -3,4 +3,3 @@ dist/
 .pytest_cache
 .ruff_cache
 .claude
-CODE_REVIEW.md

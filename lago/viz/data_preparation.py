@@ -188,10 +188,3 @@ def sort_modules_by_size(modules: Dict, top_n: int = 20) -> Dict:
         :top_n
     ]
     return dict(sorted_sizes)
-    # Return top N modules
-    # result = {}
-    # for i in range(min(top_n, len(sorted_sizes))):
-    #     original_index = sorted_sizes[i][0]
-    #     result[original_index] = list(modules.values())[original_index]
-
-    # return result

@@ -192,19 +192,19 @@ communities = lago_modules(ls, omega=1)
 communities = lago_modules(ls, omega=5)
 ```
 
-### The `alpha` Parameter
+### The `gamma` Parameter
 
-Controls community size:
+Controls community size (resolution):
 
 ```python
 # Default: balanced communities
-communities = lago_modules(ls, alpha=1)
+communities = lago_modules(ls, gamma=1)
 
 # Smaller, more focused communities
-communities = lago_modules(ls, alpha=2)
+communities = lago_modules(ls, gamma=2)
 
 # Larger, more inclusive communities
-communities = lago_modules(ls, alpha=0.5)
+communities = lago_modules(ls, gamma=0.5)
 ```
 
 ---

@@ -309,7 +309,7 @@ def populated_continuous_linkstream(
 ) -> LinkStream:
     """Pre-populated continuous linkstream."""
     ls = linkstream_factory(continuous=True)
-    ls.add_continous_links(simple_continuous_links)  # Note: typo in original code
+    ls.add_continuous_links(simple_continuous_links)  # Note: typo in original code
     return ls
 
 

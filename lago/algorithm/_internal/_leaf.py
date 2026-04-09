@@ -23,12 +23,9 @@ class Leaf:
 
     @property
     def neighbors(self) -> set:
-        neighbors = set([self.left_time_active_neighbor, self.right_time_active_neighbor])
-        neighbors |= set(
-            [neighb.target for neighb in self.topo_neighbors | self.topo_neighbors_from]
-        )
-        if None in neighbors:
-            neighbors.remove(None)
+        neighbors = {self.left_time_active_neighbor, self.right_time_active_neighbor}
+        neighbors |= {neighb.target for neighb in self.topo_neighbors | self.topo_neighbors_from}
+        neighbors.discard(None)
         return neighbors
 
     def __str__(self) -> str:

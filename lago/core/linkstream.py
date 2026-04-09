@@ -267,11 +267,27 @@ class LinkStream:
                 source, target, time_raw = link[0], link[1], link[2]
                 weight = 1
 
+            # Validate node types
+            if not isinstance(source, int) or not isinstance(target, int):
+                raise TypeError(
+                    f"Node IDs must be integers, got {type(source).__name__} and "
+                    f"{type(target).__name__}. Use integer node IDs (e.g., 0, 1, 2)."
+                )
+
+            # Validate weight
+            if weight < 0:
+                raise ValueError(
+                    f"Weight must be >= 0, got {weight} for edge ({source}, {target})."
+                )
+
             # Validate time is an integer
             time = self._validate_time(time_raw, "time")
 
             # Check for duplicate edges
-            edge_key = (source, target, time)
+            if not self.directed:
+                edge_key = (min(source, target), max(source, target), time)
+            else:
+                edge_key = (source, target, time)
             if edge_key in seen_edges:
                 if self.directed:
                     raise ValueError(
@@ -378,12 +394,34 @@ class LinkStream:
                 source, target, time_raw, duration_raw = link[0], link[1], link[2], link[3]
                 initial_weight = 1
 
+            # Validate node types
+            if not isinstance(source, int) or not isinstance(target, int):
+                raise TypeError(
+                    f"Node IDs must be integers, got {type(source).__name__} and "
+                    f"{type(target).__name__}. Use integer node IDs (e.g., 0, 1, 2)."
+                )
+
+            # Validate weight
+            if initial_weight < 0:
+                raise ValueError(
+                    f"Weight must be >= 0, got {initial_weight} for edge ({source}, {target})."
+                )
+
             # Validate time and duration are integers
             time = self._validate_time(time_raw, "time")
             duration = self._validate_time(duration_raw, "duration")
 
+            # Validate duration is positive
+            if duration <= 0:
+                raise ValueError(
+                    f"Duration must be > 0, got {duration} for edge ({source}, {target}, {time})."
+                )
+
             # Check for duplicate edges
-            edge_key = (source, target, time, duration)
+            if not self.directed:
+                edge_key = (min(source, target), max(source, target), time, duration)
+            else:
+                edge_key = (source, target, time, duration)
             if edge_key in seen_edges:
                 if self.directed:
                     raise ValueError(
@@ -444,23 +482,6 @@ class LinkStream:
 
         self._compute_time_neighbors()
 
-    def add_continous_links(self, links: Sequence[tuple[int, ...]]) -> None:
-        """Add continuous links to the stream.
-
-        .. deprecated::
-            Use :meth:`add_continuous_links` instead. This method will be
-            removed in a future version.
-
-        Args:
-            links: Sequence of link tuples.
-        """
-        warnings.warn(
-            "add_continous_links is deprecated due to typo, use add_continuous_links instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.add_continuous_links(links)
-
     def add_delayed_links(self, links: Sequence[tuple[int, ...]]) -> None:
         """Add delayed links (different source/target times) to the stream.
 
@@ -518,12 +539,28 @@ class LinkStream:
                 )
                 weight = 1
 
+            # Validate node types
+            if not isinstance(source, int) or not isinstance(target, int):
+                raise TypeError(
+                    f"Node IDs must be integers, got {type(source).__name__} and "
+                    f"{type(target).__name__}. Use integer node IDs (e.g., 0, 1, 2)."
+                )
+
+            # Validate weight
+            if weight < 0:
+                raise ValueError(
+                    f"Weight must be >= 0, got {weight} for edge ({source}, {target})."
+                )
+
             # Validate times are integers
             source_time = self._validate_time(source_time_raw, "source_time")
             target_time = self._validate_time(target_time_raw, "target_time")
 
             # Check for duplicate edges
-            edge_key = (source, target, source_time, target_time)
+            if not self.directed:
+                edge_key = (min(source, target), max(source, target), source_time, target_time)
+            else:
+                edge_key = (source, target, source_time, target_time)
             if edge_key in seen_edges:
                 raise ValueError(
                     f"Duplicate edge detected: ({source}, {target}, {source_time}, {target_time}). "

@@ -37,13 +37,18 @@ def lago_modules(
             - JM (Joint-Membership): expects modules to have a very
               consistent duration of existence.
             - MM (Mean-Membership): allows greater freedom in the temporal
-              evolution of modules.
+              evolution of modules. Most general choice.
             Defaults to LexType.MM.
-        nb_iter: Number of LAGO runs. Best results are returned.
-        gamma: Resolution parameter. Must be >= 0. Higher values lead to smaller
-            modules topologically. Defaults to 1.
-        omega: Time resolution parameter. Must be >= 0. Higher values lead to more
-            smoothness in module changes. Defaults to 2.
+        nb_iter: Number of LAGO runs. Best result is returned. Higher values
+            reduce sensitivity to the greedy optimization's starting point.
+            Defaults to 1.
+        gamma: Topological resolution parameter. Must be >= 0. Higher values
+            produce smaller, tighter communities; gamma=1 (default) corresponds
+            to standard modularity resolution. Defaults to 1.
+        omega: Temporal smoothness parameter. Must be >= 0. Higher values
+            penalize community membership changes over time, producing more
+            stable communities. omega=0 ignores temporal continuity entirely.
+            Defaults to 2.
         refinement: Refinement strategy. Must be None, "STEM" or "STNM".
             Refinement significantly improves module quality but is more
             time-consuming. None = no refinement. "STNM" = Single Time Node
@@ -91,11 +96,20 @@ def lago_modules(
     lex_str = _validate_lex_type(lex)
 
     # Validate other parameters
+    if gamma < 0:
+        msg = "gamma must be >= 0."
+        raise ValueError(msg)
     if omega < 0:
         msg = "omega must be >= 0."
         raise ValueError(msg)
+    if nb_iter < 1:
+        msg = "nb_iter must be >= 1."
+        raise ValueError(msg)
     if refinement not in (None, "STNM", "STEM"):
         msg = "refinement must be None, 'STNM', or 'STEM'."
+        raise ValueError(msg)
+    if linkstream.nb_edges == 0:
+        msg = "LinkStream has no edges. Add edges with add_links() before running lago_modules()."
         raise ValueError(msg)
 
     # Pre-process continuous linkstreams

@@ -13,7 +13,8 @@ Functions:
 """
 
 from collections.abc import Sequence
-from typing import Any, Dict, List, Optional, Union
+import logging
+from typing import Any, Union
 
 import matplotlib
 import matplotlib.colors as mcolors
@@ -98,7 +99,7 @@ def generate_colors_from_palette(n: int, palette: ColorPalette | None = None) ->
             return colors
         except ValueError:
             # Invalid colormap name, fall back to pastel colors
-            print(f"Warning: Unknown colormap '{palette}', using default pastel colors")
+            logging.getLogger(__name__).warning("Unknown colormap '%s', using default pastel colors", palette)
             return generate_pastel_colors(n)
     else:
         # It's a sequence of colors - cycle through them if needed

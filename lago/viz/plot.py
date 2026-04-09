@@ -13,6 +13,7 @@ Example:
     >>> plot.save("output.png")
 """
 
+import warnings
 from collections.abc import Sequence
 from typing import (
     Any,
@@ -1559,8 +1560,6 @@ class LongitudinalModulesPlot:
                     else:
                         missing_nodes.append((node_id, label))
                 if missing_nodes:
-                    import warnings
-
                     warnings.warn(
                         f"Labels for {len(missing_nodes)} nodes were not assigned because "
                         f"those nodes are not in the nodes_mapping (likely filtered out by auto_node_ordering). "
@@ -1711,8 +1710,6 @@ class LongitudinalModulesPlot:
 
         # Check for nodes in linkstream that are not in the display set
         # and emit a warning if found
-        import warnings
-
         unmapped_nodes: set[NodeId] = set()
         for node1, node2, *rest in time_links:
             if node1 not in nodes_mapping:

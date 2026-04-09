@@ -55,7 +55,6 @@ def draw_module_periods(
         continuous time ranges for each node within each module.
     """
     periods = []
-    # margin_commu_segment = 0.35
     for module_label, nodes_segment in modules_nodes_segments.items():
         for node, segments in nodes_segment.items():
             for segment in segments:
@@ -102,7 +101,6 @@ def draw_nodes(
         linewidth: Line width for regular (non-focused) nodes. Default 0.25.
         linewidth_focus: Line width for focused nodes. Default 0.5.
     """
-    # longitudinal_margin = 0.3
     for node in nodes:
         if highlight_node_focus and node in node_focus:
             ax.hlines(

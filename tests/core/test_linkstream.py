@@ -219,13 +219,10 @@ class TestAddLinks:
         linkstream_factory: Callable[..., LinkStream],
         duplicate_links: list[tuple[int, int, int]],
     ) -> None:
-        """Test adding duplicate links."""
+        """Test that duplicate links are rejected."""
         ls = linkstream_factory()
-        ls.add_links(duplicate_links)
-
-        # Each duplicate counts as a separate edge
-        assert ls.nb_edges == 3
-        assert ls.weight == 3
+        with pytest.raises(ValueError, match="Duplicate edge detected"):
+            ls.add_links(duplicate_links)
 
     def test_large_timestamps(
         self,
@@ -379,7 +376,7 @@ class TestContinuousLinkStream:
     ) -> None:
         """Test adding simple continuous links."""
         ls = linkstream_factory(continuous=True)
-        ls.add_continous_links(simple_continuous_links)  # Note: typo in original
+        ls.add_continuous_links(simple_continuous_links)  # Note: typo in original
 
         assert ls.nb_nodes == 3
         assert ls.nb_edges == 2
@@ -391,7 +388,7 @@ class TestContinuousLinkStream:
         """Test weight calculation for continuous links (weight * duration)."""
         ls = linkstream_factory(continuous=True)
         # Link with duration 3, weight 1 -> total weight = 3
-        ls.add_continous_links([(0, 1, 0, 3)])
+        ls.add_continuous_links([(0, 1, 0, 3)])
 
         assert ls.weight == 3.0
 
@@ -402,7 +399,7 @@ class TestContinuousLinkStream:
     ) -> None:
         """Test continuous links with explicit weights."""
         ls = linkstream_factory(continuous=True)
-        ls.add_continous_links(weighted_continuous_links)
+        ls.add_continuous_links(weighted_continuous_links)
 
         # (0,1,0,3,2.0) -> 3 * 2.0 = 6.0
         # (1,2,1,2,0.5) -> 2 * 0.5 = 1.0
@@ -414,7 +411,7 @@ class TestContinuousLinkStream:
     ) -> None:
         """Test that time instants are recorded for continuous links."""
         ls = linkstream_factory(continuous=True)
-        ls.add_continous_links(
+        ls.add_continuous_links(
             [
                 (0, 1, 0, 3),  # t=0 to t=3
                 (1, 2, 1, 2),  # t=1 to t=3
@@ -432,7 +429,7 @@ class TestContinuousLinkStream:
     ) -> None:
         """Test min/max time calculation for continuous links."""
         ls = linkstream_factory(continuous=True)
-        ls.add_continous_links(
+        ls.add_continuous_links(
             [
                 (0, 1, 5, 10),  # t=5 to t=15
             ]
@@ -447,7 +444,7 @@ class TestContinuousLinkStream:
     ) -> None:
         """Test continuous links in directed mode."""
         ls = linkstream_factory(continuous=True, directed=True)
-        ls.add_continous_links([(0, 1, 0, 3)])
+        ls.add_continuous_links([(0, 1, 0, 3)])
 
         assert ls.degrees_out[0] == 3.0  # weight = duration * 1
         assert ls.degrees_in[1] == 3.0
@@ -459,7 +456,7 @@ class TestContinuousLinkStream:
     ) -> None:
         """Test overlapping continuous links."""
         ls = linkstream_factory(continuous=True)
-        ls.add_continous_links(overlapping_continuous_links)
+        ls.add_continuous_links(overlapping_continuous_links)
 
         # Should handle overlapping time intervals
         assert ls.nb_nodes == 3
@@ -758,7 +755,7 @@ class TestProperties:
     ) -> None:
         """Test get_time_links for continuous links."""
         ls = linkstream_factory(continuous=True)
-        ls.add_continous_links([(0, 1, 0, 3)])
+        ls.add_continuous_links([(0, 1, 0, 3)])
 
         time_links = ls.get_time_links()
         assert len(time_links) > 0
@@ -876,7 +873,7 @@ class TestIntegration:
     ) -> None:
         """Test directed continuous linkstream."""
         ls = linkstream_factory(continuous=True, directed=True)
-        ls.add_continous_links(
+        ls.add_continuous_links(
             [
                 (0, 1, 0, 3),
                 (1, 2, 1, 2),

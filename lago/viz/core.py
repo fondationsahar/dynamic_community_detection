@@ -69,12 +69,6 @@ def rank_from_similarities(
     # Rank elements
     sorted_indices = np.argsort(positions)
     rank_mapping = {idx_to_id[idx]: rank for rank, idx in enumerate(sorted_indices)}
-    # transformed = mds.fit_transform(distance)
-    # positions = transformed.flatten() if transformed is not None else np.array([])
-
-    # # Rank elements
-    # sorted_indices = np.argsort(positions)
-    # rank_mapping = {idx_to_id[idx]: rank for rank, idx in enumerate(sorted_indices)}
 
     return rank_mapping, positions, ids
 

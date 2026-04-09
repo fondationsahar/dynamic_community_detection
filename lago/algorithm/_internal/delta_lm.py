@@ -273,7 +273,7 @@ class DeltaLongitudinalModularityComputer:
 
         expectation_diff = 0
 
-        all_nodes = set([leaf.node for leaf in M0_leaves | Mx_leaves])
+        all_nodes = {leaf.node for leaf in M0_leaves | Mx_leaves}
         for node1, node2 in combinations_with_replacement(all_nodes, 2):
             expectation_diff += self._partial_expectation_mm_diff(
                 node1, node2, nodes_durations, partite_mapping
@@ -336,7 +336,7 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: sum of the nodes degrees
         """
-        nodes = set([leaf.node for leaf in module_leaves])
+        nodes = {leaf.node for leaf in module_leaves}
         degrees = {node: self.linkstream.degrees[node] for node in nodes}
         return sum(degrees.values())
 
@@ -349,7 +349,7 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: sum of the nodes degrees
         """
-        nodes = set([leaf.node for leaf in module_leaves])
+        nodes = {leaf.node for leaf in module_leaves}
         degrees = {node: self.linkstream.degrees_in.get(node, 0) for node in nodes}
         return sum(degrees.values())
 
@@ -362,6 +362,6 @@ class DeltaLongitudinalModularityComputer:
         Returns:
             float: sum of the nodes degrees
         """
-        nodes = set([leaf.node for leaf in module_leaves])
+        nodes = {leaf.node for leaf in module_leaves}
         degrees = {node: self.linkstream.degrees_out.get(node, 0) for node in nodes}
         return sum(degrees.values())

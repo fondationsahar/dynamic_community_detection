@@ -45,6 +45,9 @@ for module in communities.iter_modules():
     print(f"Community {module.label}: nodes {module.nodes}, duration {module.duration}")
 ```
 
+> **Note:** LAGO works on discrete integer timestamps. For best results, normalize your
+> timestamps so that the smallest time gap is 1 (e.g., divide all timestamps by their GCD).
+
 ## Features
 
 | Feature | Description |

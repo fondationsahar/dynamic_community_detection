@@ -54,12 +54,11 @@ def get_module_duration(module_leaves: set[Leaf]) -> float:
     # all_times = [*{leaf.time for leaf in module_leaves}]
     all_times = set()
     for leaf in module_leaves:
-        all_times |= set(
-            range(
-                leaf.time,
-                leaf.time + list(leaf.topo_neighbors | leaf.topo_neighbors_from)[0].duration + 1,
-            )
-        )
+        all_neighbors = leaf.topo_neighbors | leaf.topo_neighbors_from
+        if not all_neighbors:
+            continue
+        duration = next(iter(all_neighbors)).duration
+        all_times |= set(range(leaf.time, leaf.time + duration + 1))
     all_times = list(all_times)
     if not all_times:
         return 0

@@ -67,7 +67,7 @@ class _LagoModule:
         """
         leaves_neighbors: set[Leaf] = set()
         for leaf in self.leaves:
-            leaves_neighbors |= set([tmp_neighbor.target for tmp_neighbor in leaf.topo_neighbors])
+            leaves_neighbors |= {tmp_neighbor.target for tmp_neighbor in leaf.topo_neighbors}
             right_time_neighb = leaf.right_time_active_neighbor
             if right_time_neighb is not None:
                 leaves_neighbors.add(right_time_neighb)
@@ -76,11 +76,9 @@ class _LagoModule:
                 leaves_neighbors.add(left_time_neighb)
 
         if subset:
-            self.neighbors = set([leaf.module for leaf in leaves_neighbors & subset])
+            self.neighbors = {leaf.module for leaf in leaves_neighbors & subset if leaf.module is not None}
         else:
-            self.neighbors = set([leaf.module for leaf in leaves_neighbors])
-
-        self.neighbors.discard(None)
+            self.neighbors = {leaf.module for leaf in leaves_neighbors if leaf.module is not None}
 
     def duplicates(self) -> Self:
         """Create a shallow copy of this module.

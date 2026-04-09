@@ -209,7 +209,11 @@ class TimeModule:
         return False
 
     def __len__(self) -> int:
-        """Number of (node, time) members."""
+        """Number of (node, time) members.
+
+        Note: This returns the total number of (node, time) pairs, not the
+        number of unique nodes. Use ``.size`` for the number of unique nodes.
+        """
         return len(self.members)
 
     def __eq__(self, other: object) -> bool:

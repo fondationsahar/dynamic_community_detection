@@ -79,9 +79,8 @@ class _LagoModule:
             self.neighbors = set([leaf.module for leaf in leaves_neighbors & subset])
         else:
             self.neighbors = set([leaf.module for leaf in leaves_neighbors])
-        for neighbor in self.neighbors:
-            if neighbor is None:
-                self.neighbors.remove(neighbor)
+
+        self.neighbors.discard(None)
 
     def duplicates(self) -> Self:
         """Create a shallow copy of this module.

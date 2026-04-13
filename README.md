@@ -135,7 +135,7 @@ communities.to_json("results.json")
 All examples are interactive Jupyter notebooks. Run `jupyter notebook` in the examples folder to get started!
 
 📄 **Papers**
-- [LAGO Method (arXiv)](https://arxiv.org/abs/2510.00741) — Algorithm details and experiments
+- [LAGO Method (ICDM)](https://ieeexplore.ieee.org/document/11391928) — Algorithm details and experiments
 - [Longitudinal Modularity (EPJ Data Science)](https://rdcu.be/eC5fA) — Quality function theory
 
 ## Citation

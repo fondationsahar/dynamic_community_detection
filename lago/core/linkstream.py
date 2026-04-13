@@ -371,16 +371,14 @@ class LinkStream:
             links: Sequence of link tuples.
 
         Raises:
-            TypeError: If time or duration is not an integer.
-            ValueError: If duplicate edges are detected.
+            TypeError: If time, duration, or node IDs are not integers.
+            ValueError: If duration <= 0 or weight < 0.
 
         Note:
             Times must be integers. The total weight of a continuous link
-            is weight * duration.
+            is weight * duration. Duplicate continuous links are allowed
+            (e.g., to represent repeated interactions over the same interval).
         """
-        # Track edges to detect duplicates
-        seen_edges: set[tuple[int, int, int, int]] = set()
-
         for link in links:
             if len(link) > 4:
                 source, target, time_raw, duration_raw, initial_weight = (
@@ -416,31 +414,6 @@ class LinkStream:
                 raise ValueError(
                     f"Duration must be > 0, got {duration} for edge ({source}, {target}, {time})."
                 )
-
-            # Check for duplicate edges
-            if not self.directed:
-                edge_key = (min(source, target), max(source, target), time, duration)
-            else:
-                edge_key = (source, target, time, duration)
-            if edge_key in seen_edges:
-                if self.directed:
-                    raise ValueError(
-                        f"Duplicate edge detected: ({source}, {target}, {time}, {duration}). "
-                        f"The same edge appears multiple times in your input. "
-                        f"Please either:\n"
-                        f"  1. Keep only one occurrence of this edge, or\n"
-                        f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream."
-                    )
-                else:
-                    raise ValueError(
-                        f"Duplicate edge detected: ({source}, {target}, {time}, {duration}). "
-                        f"The same edge appears multiple times in your input. "
-                        f"Please either:\n"
-                        f"  1. Keep only one occurrence of this edge, or\n"
-                        f"  2. Merge the duplicates by summing their weights manually before adding to LinkStream.\n"
-                        f"Note: For undirected graphs, (A, B, t, d) and (B, A, t, d) are considered the same edge."
-                    )
-            seen_edges.add(edge_key)
 
             # Weight is scaled by duration for continuous links
             weight = initial_weight * duration

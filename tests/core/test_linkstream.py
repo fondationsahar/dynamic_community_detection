@@ -925,14 +925,14 @@ class TestInputValidation:
         ls.add_links([(0, 1, 0), (1, 0, 0)])
         assert ls.nb_edges == 2
 
-    def test_undirected_continuous_swapped_duplicate_rejected(
+    def test_continuous_duplicates_allowed(
         self,
         linkstream_factory: Callable[..., LinkStream],
     ) -> None:
-        """Swapped node order in continuous undirected mode should be a duplicate."""
+        """Duplicate continuous links should be allowed (repeated interactions)."""
         ls = linkstream_factory(continuous=True)
-        with pytest.raises(ValueError, match="Duplicate edge detected"):
-            ls.add_links([(0, 1, 0, 3), (1, 0, 0, 3)])
+        ls.add_links([(0, 1, 0, 3), (0, 1, 0, 3)])
+        assert ls.nb_edges == 2
 
     def test_undirected_delayed_swapped_duplicate_rejected(
         self,

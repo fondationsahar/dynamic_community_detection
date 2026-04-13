@@ -19,7 +19,9 @@ Previously iterated over `self.neighbors` while removing `None` inside the loop.
 
 **File:** `lago/core/linkstream.py`
 
-Edge keys for undirected graphs are now normalized as `(min(source, target), max(source, target), time)` in all three link modes (instantaneous, continuous, delayed). This correctly rejects `(A, B, t)` and `(B, A, t)` as duplicates.
+Edge keys for undirected graphs are now normalized as `(min(source, target), max(source, target), time)` in instantaneous and delayed link modes. This correctly rejects `(A, B, t)` and `(B, A, t)` as duplicates.
+
+**Note:** Duplicate detection is intentionally disabled for continuous links — duplicates there represent valid repeated interactions over the same interval.
 
 ### 1.3 Potential `IndexError` in `get_module_duration` — FIXED
 

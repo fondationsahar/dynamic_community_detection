@@ -1,4 +1,8 @@
-tests/
 dist/
 *.egg-info/
+.pytest_cache
+.ruff_cache
 .claude
+.venv*/
+.DS_Store
+**/.DS_Store

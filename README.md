@@ -1,179 +1,178 @@
-# Dynamic Community Detection: LAGO
+# LAGO
 
-**This library is a python implementation of the LAGO method for dynamic community detection on temporal networks.**
+**Dynamic Community Detection for Temporal Networks**
 
-### Getting started using pip
+[![PyPI version](https://badge.fury.io/py/dcd-lago.svg)](https://pypi.org/project/dcd-lago/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
+LAGO detects communities (modules) that evolve over time in fine-grained temporal networks (link streams). Unlike static methods, it finds groups that form, merge, split, and dissolve as interactions happen.
+
+**No time window needed.** Traditional approaches require aggregating interactions into snapshots (e.g., daily or hourly networks), losing temporal precision and forcing you to choose an arbitrary window size. LAGO works directly on the raw timestamped data—no aggregation, no information loss.
+
+<p align="center">
+<img src="img/lmodules_ex.png" alt="Temporal communities example" width="600"/>
+<br>
+<em>A link stream with 5 nodes showing two dynamic communities (blue and green) that evolve over time.</em>
+</p>
+
+## Installation
+
+```bash
+pip install dcd-lago           # Core library
+pip install dcd-lago[viz]      # With visualization
 ```
-pip install dcd-lago
-```
 
-
-## Link Streams and Dynamic Communities
-
-**Link stream** (or stream graph) model enables temporal network to have **perfect temporal precision** of temporal links (also called edges or interactions).
-
-Community detection is an essential task in static network analysis. It consists in grouping nodes so there is more edges within groups than between them.
-Adapating this task to temporal networks means that groups may evolve over time and yet be consistent over time. 
-We call this task **Dynamic Community Detection**.
-
-
-<div style="text-align: center;">
-<img src="img/dcd_example.png" alt="Link Stream example with two dynamic communities" display:block; margin:auto;  width="500" /> 
-
-*Figure 1: Link stream made up of 5 nodes (a, ...,e) with time interactions over time represented with vertical dashed lines. Two dynamic communities are displayed in blue and green.*
-
-</div>
-
-**LAGO** (Longitudinal Agglomerative Greedy Optimization) is a method to detect dynamic communities on link streams which is inspired from most used community detection methods on static graphs. It is based on the greedy optimization of the Longitudinal Modularity, an adaptation of the Modularity quality function for communities on static networks.
-
-## Usage 
-
+## Quick Start
 
 ```python
-from lago import LinkStream, lago_communities
+from lago import LinkStream, lago_modules
+
+# Create a temporal network
+ls = LinkStream()
+ls.add_links([
+    (0, 1, 0), (1, 2, 0), (0, 2, 0),  # Triangle at t=0
+    (0, 1, 1), (1, 2, 1),              # Path at t=1
+    (3, 4, 0), (3, 4, 1), (3, 4, 2),   # Pair at t=0,1,2
+    (2, 3, 2),                          # Bridge at t=2
+])
+
+# Detect temporal communities
+communities = lago_modules(ls)
+
+# Explore results
+for module in communities.iter_modules():
+    print(f"Community {module.label}: nodes {module.nodes}, duration {module.duration}")
 ```
 
-```python
-## Declare time links according to the following format:
-# <source node>, <target node>, <time instant>
-## Values must be integers
+> **Note:** LAGO works on discrete integer timestamps. For best results, normalize your
+> timestamps so that the smallest time gap is 1 (e.g., divide all timestamps by their GCD).
 
-time_links = [
-    [2, 3, 0],
-    [0, 1, 2],
-    [2, 3, 3],
-    [3, 4, 5],
-    [2, 3, 6],
-    [2, 4, 7],
-    [0, 1, 8],
-    [1, 2, 9],
-    [3, 4, 9],
-    [0, 2, 10],
-    [1, 2, 11],
-    [3, 4, 13],
-    [1, 2, 14],
-    [2, 4, 16],
-    [0, 1, 17],
-    [0, 1, 18],
-    [2, 3, 18],
-    [3, 4, 19],
-]
-```
+## Features
 
-```python
-## Initiate empty temporal network (as a link stream)
-my_linkstream = LinkStream()
+| Feature | Description |
+|---------|-------------|
+| **Temporal precision** | Handles exact timestamps, not time windows |
+| **Quality metric** | Built-in Longitudinal Modularity scoring |
+| **Flexible input** | Weighted, directed, delayed, continuous, and k-partite networks |
+| **Rich output** | Track node trajectories, community evolution, and transitions |
+| **Visualization** | Publication-ready longitudinal plots |
 
-## Add time links to the link stream
-my_linkstream.add_links(time_links)
+## Usage Examples
 
-# NOTE time links can also be imported from txt files with the read_txt() method
+### Evaluate Community Quality
 
-## Display linkstream informations
-print(f"The link stream consists of {my_linkstream.nb_edges} temporal edges (or time links) accross {my_linkstream.nb_nodes} nodes and {my_linkstream.network_duration} time steps, of which only {my_linkstream.nb_timesteps} contain activity.")
-```
-
-```python
-## Compute dynamic communities
-dynamic_communities = lago_communities(
-    my_linkstream,
-    nb_iter=3, # run LAGO 3 times and return best result
-    )
-
-# Each dynamic community is represented by a list of (<node>, <time instant>)
-
-print(f"{len(dynamic_communities)} dynamic communities have been found")
-```
-
-#### Plot Dynamic Communities
-```python
-from lago import plot_dynamic_communities
-
-fig = plot_dynamic_communities(
-        linkstream=my_linkstream,
-        communities=dynamic_communities,
-    )
-fig.show()
-```
-
-#### Compute Longitudinal Modularity Score
 ```python
 from lago import longitudinal_modularity
 
-## Compute Longitudinal Modularity score
-## (the higher the better / maximum is 1)
-long_mod_score = longitudinal_modularity(
-    my_linkstream, 
-    dynamic_communities,
-    )
-
-print(f"Dynamic communities detected on the linkstream have a Longitudinal Modularity score of {long_mod_score} ")
+result = longitudinal_modularity(ls, communities, lex="MM")
+print(f"Quality score: {result.value:.4f}")
 ```
 
-## Advanced Parameters
+### Visualize Results
 
-LAGO is a greedy method for optimizing Longitudinal Modularity, which is a quality function for dynamic communities on temporal networks. Both have many options which affects both speed and communities shapes.
+```python
+from lago.viz import LongitudinalModulesPlot
 
-### Longitudinal Modularity
-
- `lex` (Longitudinal Expectation):
-Can be either Joint-Membership (JM) or Mean-Membership (MM). From a theoretical aspect, JM expects dynamic communities to have a very consistent duration of existence, whereas MM allows greater freedom in the temporal evolution of communities. Authors lack perspective on the impact of the choice on real data. Defaults to "MM".
-
- `omega`: Time resolution Parameter indicating the required level of community continuity over time. Higher values lead to more smoothness in communities changes. Defaults to 2.
-
-### LAGO
-
-`refinement`: In greedy search optimization, a refinement strategy can improve results but increases computation time. Defaults to STEM.
-
-| Refinement      | Improvement | Time of execution| 
-| ----------- | ----------- | --------- |
-| None      |      -  | - |
-| Single Time Node Movements (STNM)   | +        | +|
-| Single Time Edge Movements (STEM)   | ++        | ++ |
-
-`refinement_in`: Whether to apply refinement strategy within the main optimization loop or not. If activated, results may be improved but requires more computation time. Defaults to True.
-
-`fast_exploration`: lighter exploration loop. If activated, it significantly reduces the time of execution but may result in poorer results. Defaults to True.
-
-
-
-## Feedback
-
-LAGO method and the python library are constantly improving. If you have any questions, suggestions or issues, please add them to [GitHub issues](https://github.com/fondationsahar/dynamic_community_detection/issues).
-
-## References
-
-### LAGO Method 
-
-[*Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity*](https://arxiv.org/abs/2510.00741) *(preprint)*
+plot = LongitudinalModulesPlot(ls, width=1200, height=600)
+plot.configure_nodes(auto_ordering=True)
+plot.configure_edges(show_activity=True)
+plot.configure_communities(communities=communities)
+plot.draw()
+plot.save("communities.png", dpi=150)
 ```
-@misc{brabant2025discoveringcommunitiescontinuoustimetemporal,
-      title={Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity}, 
-      author={Victor Brabant and Angela Bonifati and Rémy Cazabet},
-      year={2025},
-      eprint={2510.00741},
-      archivePrefix={arXiv},
-      primaryClass={cs.SI},
-      url={https://arxiv.org/abs/2510.00741}, 
+
+### Explore Results
+
+```python
+# Track a specific node
+trajectory = communities.get_node_trajectory(node_id=0)
+print(f"Node 0 was in communities: {trajectory}")
+
+# Get community membership at a specific time
+membership = communities.get_nodes_modules_membership_at_time(time=1)
+print(f"At t=1: {membership}")
+
+# Save/load results
+communities.to_json("results.json")
+```
+
+## Key Parameters
+
+### `lago_modules()`
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `lex` | `"MM"` | Expectation type: `"MM"` (flexible) or `"JM"` (stable communities) |
+| `omega` | `2` | Temporal smoothness (higher = fewer community switches) |
+| `gamma` | `1` | Resolution (higher = smaller communities) |
+| `refinement` | `"STEM"` | Refinement strategy: `None`, `"STNM"`, or `"STEM"` |
+| `nb_iter` | `1` | Number of runs (keeps best result) |
+
+### `longitudinal_modularity()`
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `lex` | `"MM"` | Expectation type: `"MM"`, `"JM"`, or `"CM"` |
+| `omega` | `2.0` | Weight for temporal penalty |
+| `gamma` | `1.0` | Weight for expectation term |
+
+## Documentation
+
+📖 **Guides**
+- [Getting Started](examples/01_getting_started.md) — Concepts and first steps
+- [API Reference](docs/API_REFERENCE.md) — Complete function documentation
+
+📁 **Examples** ([examples/](examples/))
+- [LinkStream Types](examples/02_linkstream_types.ipynb) — Weighted, directed, continuous, delayed, k-partite networks
+- [Community Detection](examples/03_community_detection.ipynb) — Using `lago_modules` and exploring results
+- [Modularity](examples/04_modularity.ipynb) — Computing and understanding quality scores
+- [Visualization](examples/05_visualization.ipynb) — Creating publication-ready plots
+
+💡 **Practical Guides**
+- [Real-World Preprocessing](examples/real_world_preprocessing.ipynb) — Working with names and date strings
+
+All examples are interactive Jupyter notebooks. Run `jupyter notebook` in the examples folder to get started!
+
+📄 **Papers**
+- [LAGO Method (arXiv)](https://arxiv.org/abs/2510.00741) — Algorithm details and experiments
+- [Longitudinal Modularity (EPJ Data Science)](https://rdcu.be/eC5fA) — Quality function theory
+
+## Citation
+
+If you use LAGO in your research, please cite:
+
+**LAGO Method:**
+```bibtex
+@INPROCEEDINGS{11391928,
+  author={Brabant, Victor and Bonifati, Angela and Cazabet, Rémy},
+  booktitle={2025 IEEE International Conference on Data Mining (ICDM)}, 
+  title={Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity}, 
+  year={2025},
+  volume={},
+  number={},
+  pages={1065-1074},
+  keywords={Accuracy;Network analyzers;Benchmark testing;Market research;Data mining;Optimization;Guidelines;temporal networks;community detection;dynamic communities;link stream;modularity},
+  doi={10.1109/ICDM65498.2025.00115}}
+```
+
+**Longitudinal Modularity:**
+```bibtex
+@article{Brabant2025lmod,
+    title={Longitudinal modularity, a modularity for link streams},
+    author={Brabant, Victor and Asgari, Yasaman and Borgnat, Pierre and Bonifati, Angela and Cazabet, Rémy},
+    journal={EPJ Data Science},
+    volume={14},
+    number={1},
+    year={2025},
+    doi={10.1140/epjds/s13688-025-00529-x},
 }
 ```
 
-### Longitudinal Modularity
+## Contributing
 
-[*Longitudinal Modularity, a Modularity for Link Streams*](https://rdcu.be/eC5fA)
-```
-@article{Brabant2025,
-  title = {Longitudinal modularity,  a modularity for link streams},
-  volume = {14},
-  ISSN = {2193-1127},
-  url = {http://dx.doi.org/10.1140/epjds/s13688-025-00529-x},
-  DOI = {10.1140/epjds/s13688-025-00529-x},
-  number = {1},
-  journal = {EPJ Data Science},
-  publisher = {Springer Science and Business Media LLC},
-  author = {Brabant,  Victor and Asgari,  Yasaman and Borgnat,  Pierre and Bonifati,  Angela and Cazabet,  Rémy},
-  year = {2025},
-  month = feb 
-}
-```
+Questions, suggestions, or issues? Please open a [GitHub issue](https://github.com/fondationsahar/dynamic_community_detection/issues).
+
+## License
+
+MIT License — see [LICENSE.txt](LICENSE.txt)

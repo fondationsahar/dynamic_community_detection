@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import copy
 import random
 import sys
 
-import numpy as np
-
 import lago.core.utils as tls
-from lago.algorithm._internal._lago_module import _LagoModule
 from lago.algorithm._internal.runner import lago_run
 from lago.core.enums import LexType
 from lago.core.linkstream import LinkStream
@@ -43,9 +39,12 @@ def lago_modules(
             - MM (Mean-Membership): allows greater freedom in the temporal
               evolution of modules. Most general choice.
             Defaults to LexType.MM.
-        nb_iter: Number of LAGO runs. Best result is returned. Higher values
-            reduce sensitivity to the greedy optimization's starting point.
-            Defaults to 1.
+        nb_iter: Number of LAGO runs. Best result is returned. Each run explores
+            the candidate moves in a different order, which is what the greedy
+            optimization is sensitive to, so higher values reduce sensitivity to
+            the starting point at proportionally higher cost. The orders are
+            derived from `seed`, so a given (seed, nb_iter) pair is fully
+            reproducible. Defaults to 1.
         gamma: Topological resolution parameter. Must be >= 0. Higher values
             produce smaller, tighter communities; gamma=1 (default) corresponds
             to standard modularity resolution. Defaults to 1.
@@ -70,15 +69,17 @@ def lago_modules(
             Defaults to 0.
         stopping_criterion: Convergence threshold. Defaults to 1e-8.
         ndigits_logs: Number of decimal places for logging. Defaults to 8.
-        seed: Optional random seed for reproducibility. When set, seeds Python's
-            `random` module and NumPy's global RNG at the start of the call.
-            Note: For fully bit-exact reproducibility across Python processes,
-            also set the environment variable ``PYTHONHASHSEED=<value>`` before
-            launching Python. This is required because internal set iteration
-            order depends on object-identity hashing, which varies across
-            processes unless hash randomization is disabled. Within a single
-            process, results are reproducible without this env variable.
-            Defaults to None (non-reproducible).
+        seed: Selects the order in which candidate moves are explored, which is
+            the only thing that varies between runs on the same input.
+
+            Every result is reproducible: the same arguments always give the
+            same modules, in this process or any other, with or without a seed.
+            What the seed chooses is *which* greedy trajectory to follow.
+            Different seeds reach different local optima -- on the bundled
+            120-node fixture the spread is about 3% of L-modularity -- which is
+            what `nb_iter` exploits.
+
+            None (the default) uses the canonical order. Defaults to None.
 
     Returns:
         TimeModules: Detected temporal modules.
@@ -105,11 +106,6 @@ def lago_modules(
             print(f"Module {module.label}: {module.nodes}")
         ```
     """
-    # Seed RNGs for reproducibility of any stochastic components
-    if seed is not None:
-        random.seed(seed)
-        np.random.seed(seed)
-
     # Validate and normalize lex
     lex_str = _validate_lex_type(lex)
 
@@ -162,7 +158,7 @@ def lago_modules(
 
     # Run LAGO algorithm (potentially multiple iterations)
     best_modularity = -sys.maxsize
-    best_modules: set[_LagoModule] = set()
+    best_segments: dict[int, dict[int, tuple[tuple[int, int], ...]]] = {}
 
     # Convert verbose to int for internal lago_run
     verbose_int = int(verbose) if isinstance(verbose, bool) else verbose
@@ -181,12 +177,19 @@ def lago_modules(
             verbose_int,
             stopping_criterion * linkstream.weight,
             ndigits_logs,
+            _exploration_rng(seed, iteration),
         )
 
-        # Keep best result
+        # Keep best result. Recorded as segments rather than as live modules:
+        # the next iteration rebuilds every module from scratch, so holding on
+        # to the objects would keep a partition that no longer describes the
+        # state its leaves are in.
         if modularity > best_modularity:
             best_modularity = modularity
-            best_modules = copy.copy(modules)
+            best_segments = {
+                label: tls.get_module_segments(module.leaves)
+                for label, module in enumerate(sorted(modules, key=lambda m: m.index))
+            }
             log_info(
                 f"Iteration {iteration + 1}/{nb_iter}: improved to {round(best_modularity, ndigits=ndigits_logs)}",
                 verbose,
@@ -194,8 +197,36 @@ def lago_modules(
         else:
             log_debug(f"Iteration {iteration + 1}/{nb_iter}: no improvement", verbose)
 
-    log_info(f"Found {len(best_modules)} modules", verbose)
-    return _convert_to_time_modules(best_modules)
+    log_info(f"Found {len(best_segments)} modules", verbose)
+    return TimeModules.from_segments(best_segments)
+
+
+def _exploration_rng(seed: int | None, iteration: int) -> random.Random | None:
+    """Generator deciding the exploration order of one LAGO iteration.
+
+    The greedy search is sensitive to the order in which candidates are
+    considered, and that order is the only thing ``nb_iter`` can vary.
+
+    Returns ``None`` -- meaning the canonical order -- for the very first
+    iteration of an unseeded call, so that the default single run reproduces
+    exactly what it always has. Every other combination gets a generator whose
+    stream depends only on ``(seed, iteration)``, so restarts explore genuinely
+    different orders and any given run stays reproducible.
+
+    Args:
+        seed: The caller's seed, or None.
+        iteration: Zero-based iteration index within this call.
+
+    Returns:
+        A seeded ``random.Random``, or None for the canonical order.
+    """
+    if seed is None:
+        if iteration == 0:
+            return None
+        return random.Random(iteration)
+    # Plain arithmetic rather than hash(): reproducible across processes and
+    # Python versions without depending on any hashing detail.
+    return random.Random(seed * 1_000_003 + iteration)
 
 
 def _validate_lex_type(lex_type: LexType | str) -> str:
@@ -230,18 +261,3 @@ def _validate_lex_type(lex_type: LexType | str) -> str:
         raise ValueError(msg)
 
     return lex_str
-
-
-def _convert_to_time_modules(modules: set[_LagoModule]) -> TimeModules:
-    """Convert raw _LagoModule objects to TimeModules.
-
-    Args:
-        modules: Set of _LagoModule objects from LAGO algorithm.
-
-    Returns:
-        TimeModules: A TimeModules object containing the detected modules.
-    """
-    raw_modules = {
-        label: tls.get_expanded_module(module.leaves) for label, module in enumerate(modules)
-    }
-    return TimeModules(raw_modules)

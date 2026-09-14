@@ -3,6 +3,7 @@ from ._lago_module import _LagoModule
 from .delta_lm import (
     DeltaLongitudinalModularityComputer,
 )
+from .leaf_set import LeafDifference
 
 # Global counters for tracking (only used when verbose >= 4)
 _find_best_stats = {
@@ -60,9 +61,14 @@ def find_best_module_for_submodule(
     _find_best_stats["calls"] += 1
 
     if modules is None:
-        # Get parents of submodule neighbors
+        # Get parents of submodule neighbors.
+        # Sorted by creation index so that the candidate order -- and therefore
+        # which module wins an exact tie below -- is a function of the data.
         neighbors = submodule.neighbors
-        modules = list({module.parent for module in neighbors if module.parent is not None})
+        modules = sorted(
+            {module.parent for module in neighbors if module.parent is not None},
+            key=lambda m: m.index,
+        )
 
     # Exclude self parent from move options
     if modules and submodule.parent in modules:
@@ -80,8 +86,12 @@ def find_best_module_for_submodule(
         _find_best_stats["no_modules"] += 1
         return None, None
 
-    M1_leaves = submodule.parent.leaves - M0_leaves
+    # A view rather than a copy: the parent is the largest set in sight and the
+    # leaving move only ever tests membership in it. See leaf_set.LeafDifference.
+    M1_leaves = LeafDifference(submodule.parent.leaves, M0_leaves)
 
+    # M0 is part of its parent, so M1 U M0 is exactly the parent's leaves: the
+    # parent's memoised durations serve as the "union" side of the leaving move.
     # NOTE maybe could be optimized because if M1_leaves is empty
     # no computing is needed. Check that.
     delta_lm_M0_leaving_M1 = -delta_lm_computer.M0_to_Mx(
@@ -89,12 +99,17 @@ def find_best_module_for_submodule(
         M0_time_segments=M0_time_segments,
         Mx_leaves=M1_leaves,
         partite_mapping=partite_mapping,
+        union_module=submodule.parent,
     )
 
     candidates_delta_lm: dict[_LagoModule, float] = {}
 
     for module in modules:
-        M2_leaves = module.leaves - M0_leaves
+        # Candidate modules are other parents, and the modules partition the
+        # leaves, so M0 is normally disjoint from them and the difference is a
+        # plain copy. Checking costs O(|M0|); the copy costs O(|module|).
+        disjoint = module.leaves.isdisjoint(M0_leaves)
+        M2_leaves = module.leaves if disjoint else module.leaves - M0_leaves
 
         if M1_leaves == M2_leaves:
             continue
@@ -104,6 +119,9 @@ def find_best_module_for_submodule(
             M0_time_segments=M0_time_segments,
             Mx_leaves=M2_leaves,
             partite_mapping=partite_mapping,
+            # Only when M2 is the module untouched: otherwise the leaf set we
+            # pass is not the one the module memoised.
+            mx_module=module if disjoint else None,
         )
 
         candidates_delta_lm[module] = delta_lm_M0_leaving_M1 + delta_lm_M0_joining_M2

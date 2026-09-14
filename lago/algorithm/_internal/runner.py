@@ -1,6 +1,6 @@
 from lago.core.linkstream import LinkStream
 
-from ._lago_module import _LagoModule
+from ._lago_module import _LagoModule, reset_module_counter
 from .delta_lm import (
     DeltaLongitudinalModularityComputer,
 )
@@ -22,6 +22,7 @@ def lago_run(
     verbose: bool | int,
     stopping_criterion: float,
     ndigits_logs: int,
+    rng=None,
 ):
     """Apply LAGO once.
     Args:
@@ -64,6 +65,7 @@ def lago_run(
         fast_exploration,
         refinement,
         stopping_criterion,
+        rng,
     )
     if refinement_in:
         return run_with_refinement_in_rtmm(
@@ -94,6 +96,7 @@ def _init_movers(
     fast_exploration: bool,
     refinement: str | None,
     stopping_criterion: float,
+    rng=None,
 ):
     modules = _init_modules(linkstream)
 
@@ -109,6 +112,7 @@ def _init_movers(
         lm_computer,
         linkstream.partite_mapping,
         stopping_criterion,
+        rng,
     )
 
     refiner = None
@@ -120,6 +124,7 @@ def _init_movers(
             lm_computer,
             linkstream.partite_mapping,
             stopping_criterion,
+            rng,
         )
 
     elif refinement == "STEM":
@@ -129,12 +134,17 @@ def _init_movers(
             modules,
             lm_computer,
             stopping_criterion,
+            rng,
         )
 
     return time_module_mover, refiner
 
 
 def _init_modules(linkstream: LinkStream) -> set[_LagoModule]:
+    # Restart the module creation index so that a run's exploration order does
+    # not depend on how many modules earlier runs in this process created.
+    reset_module_counter()
+
     modules = set()
     iterator = linkstream.leaves_dict.values()
     for leaf in iterator:

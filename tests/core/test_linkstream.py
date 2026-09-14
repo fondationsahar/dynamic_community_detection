@@ -938,10 +938,27 @@ class TestInputValidation:
         self,
         linkstream_factory: Callable[..., LinkStream],
     ) -> None:
-        """Swapped node order in delayed undirected mode should be a duplicate."""
+        """A delayed undirected link is a duplicate when both endpoints match.
+
+        (A, B, t1, t2) joins the time-nodes (A, t1) and (B, t2), so its swapped
+        form is (B, A, t2, t1) -- the nodes and their times must swap together.
+        """
         ls = linkstream_factory(delayed=True)
         with pytest.raises(ValueError, match="Duplicate edge detected"):
-            ls.add_links([(0, 1, 0, 5), (1, 0, 0, 5)])
+            ls.add_links([(0, 1, 0, 5), (1, 0, 5, 0)])
+
+    def test_undirected_delayed_swapped_nodes_only_not_duplicate(
+        self,
+        linkstream_factory: Callable[..., LinkStream],
+    ) -> None:
+        """Swapping the nodes but not the times gives a different edge.
+
+        (0, 1, 0, 5) joins (0, 0) to (1, 5); (1, 0, 0, 5) joins (1, 0) to (0, 5).
+        Different time-node pairs, so both are legitimate.
+        """
+        ls = linkstream_factory(delayed=True)
+        ls.add_links([(0, 1, 0, 5), (1, 0, 0, 5)])
+        assert ls.nb_edges == 2
 
 
 class TestLagoModulesValidation:

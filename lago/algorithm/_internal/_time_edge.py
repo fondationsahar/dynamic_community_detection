@@ -37,8 +37,14 @@ class TimeEdge:
         self.duration = duration
 
     def __hash__(self) -> int:
-        """Return hash based on target identity, weight, and duration."""
-        return hash((id(self.target), self.weight, self.duration))
+        """Return hash based on target identity, weight, and duration.
+
+        The target is identified by its (node, time) pair rather than by id():
+        leaves are unique per (node, time) within a LinkStream, so this agrees
+        with __eq__ while keeping the iteration order of every edge set a
+        function of the data instead of of the memory allocator.
+        """
+        return hash((self.target.node, self.target.time, self.weight, self.duration))
 
     def __eq__(self, other: object) -> bool:
         """Check equality based on target identity, weight, and duration."""

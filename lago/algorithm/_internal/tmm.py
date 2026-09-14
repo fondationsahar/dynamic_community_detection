@@ -1,10 +1,9 @@
-import copy
-
 from . import lago_tools as lts
 from ._lago_module import _LagoModule
 from .delta_lm import (
     DeltaLongitudinalModularityComputer,
 )
+from .exploration import ExplorationQueue
 from .find_best_move import (
     find_best_module_for_submodule,
     get_find_best_stats,
@@ -20,12 +19,16 @@ class TimeModuleMover:
         delta_lm_computer: DeltaLongitudinalModularityComputer,
         partite_mapping: dict[int, int],
         stopping_criterion: float = 0.0,
+        rng=None,
     ) -> None:
         self.fast_exploration = fast_exploration
         self.modules = modules
         self.delta_lm_computer = delta_lm_computer
         self.partite_mapping = partite_mapping
         self.stopping_criterion = stopping_criterion
+        # None keeps the canonical exploration order; a seeded generator picks
+        # a different, reproducible one (see exploration.ExplorationQueue).
+        self.rng = rng
 
     def run(self, verbose: bool | int = 0) -> float:
         """Optimize one level of Recursive Time Module Mover.
@@ -96,7 +99,7 @@ class TimeModuleMover:
                     )
 
             move = False
-            tmp_leaves_modules = copy.copy(submodules)
+            tmp_leaves_modules = ExplorationQueue(submodules, rng=self.rng)
             inner_loop_iteration = 0
             iteration_moves = 0  # Track moves in this iteration
 
@@ -111,7 +114,7 @@ class TimeModuleMover:
                 child_module = tmp_leaves_modules.pop()
 
                 # Track how many times each module is processed
-                module_id = id(child_module)
+                module_id = child_module.index
                 module_process_count[module_id] = module_process_count.get(module_id, 0) + 1
 
                 # Heartbeat every 1000 modules to show progress
@@ -140,8 +143,11 @@ class TimeModuleMover:
                 old_parent = child_module.parent
 
                 # Check cache to prevent oscillating moves
-                move_key = (id(child_module), id(old_parent), id(best_module))
-                reverse_key = (id(child_module), id(best_module), id(old_parent))
+                # Keyed on creation indices, not id(): addresses are recycled
+                # once a module is dropped, which makes id()-based keys collide
+                # with unrelated earlier moves.
+                move_key = (child_module.index, old_parent.index, best_module.index)
+                reverse_key = (child_module.index, best_module.index, old_parent.index)
 
                 # If reverse move was made previously, only allow this move if gain is strictly higher
                 if reverse_key in move_cache:
@@ -151,7 +157,7 @@ class TimeModuleMover:
                         blocked_moves += 1
                         if verbose >= 3:
                             print(
-                                f"[CACHE] Blocked move: Module[id:{id(child_module)}] from {id(old_parent)} to {id(best_module)}, "
+                                f"[CACHE] Blocked move: Module[{child_module.index}] from {old_parent.index} to {best_module.index}, "
                                 f"gain {delta_lm:.6e} <= previous reverse gain {previous_reverse_gain:.6e}"
                             )
                         continue
@@ -160,20 +166,20 @@ class TimeModuleMover:
                 if verbose >= 3:
                     # Create a simple identifier for the module using its leaves
                     module_identifier = (
-                        f"Module[{len(child_module.leaves)} leaves, id:{id(child_module)}]"
+                        f"Module[{len(child_module.leaves)} leaves, #{child_module.index}]"
                     )
-                    move_tuple = (id(child_module), id(old_parent), id(best_module))
+                    move_tuple = (child_module.index, old_parent.index, best_module.index)
 
                     # Check if this is a reverse of a recent move
-                    reverse_move = (id(child_module), id(best_module), id(old_parent))
+                    reverse_move = (child_module.index, best_module.index, old_parent.index)
                     if reverse_move in move_history:
                         reverse_move_count += 1
                         print(
-                            f"[MOVE] {module_identifier} from parent {id(old_parent)} -> parent {id(best_module)}, delta_lm: {delta_lm:.6e} [REVERSE MOVE #{reverse_move_count}]"
+                            f"[MOVE] {module_identifier} from parent {old_parent.index} -> parent {best_module.index}, delta_lm: {delta_lm:.6e} [REVERSE MOVE #{reverse_move_count}]"
                         )
                     else:
                         print(
-                            f"[MOVE] {module_identifier} from parent {id(old_parent)} -> parent {id(best_module)}, delta_lm: {delta_lm:.6e}"
+                            f"[MOVE] {module_identifier} from parent {old_parent.index} -> parent {best_module.index}, delta_lm: {delta_lm:.6e}"
                         )
 
                     move_history.append(move_tuple)
@@ -197,7 +203,7 @@ class TimeModuleMover:
                     # Warn if we're adding more modules than we're removing
                     if verbose >= 3 and inner_loop_iteration % 1000 == 0:
                         print(
-                            f"[LOOP TRACKING] TMM last move: module moved from parent {id(old_parent)} to {id(best_module)}, added {added_count} neighbors back"
+                            f"[LOOP TRACKING] TMM last move: module moved from parent {old_parent.index} to {best_module.index}, added {added_count} neighbors back"
                         )
                 else:
                     move = True

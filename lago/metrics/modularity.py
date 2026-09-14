@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 from itertools import combinations_with_replacement
+from math import floor, isfinite, ulp
 from typing import TYPE_CHECKING
 
 from lago.core.enums import LexType
 from lago.core.time_modules import TimeModules
 from lago.core.utils import (
     get_module_duration_from_members,
+    get_module_duration_from_segments,
     get_nodes_durations_from_members,
+    get_nodes_durations_from_segments,
     get_nodes_times_from_members,
+    iter_coexistence_spans,
 )
 
 if TYPE_CHECKING:
@@ -96,8 +101,9 @@ class _DegreeCache:
         multiplier = 2 if source != target else 1
         ls = self._linkstream
 
-        # Check if same partite
-        if ls.partite_mapping.get(source, -1) == ls.partite_mapping.get(source, -2):
+        # In k-partite networks, only interactions between different partites
+        # are expected, so a within-partite pair contributes nothing.
+        if ls.partite_mapping.get(source, -1) == ls.partite_mapping.get(target, -2):
             return 0
 
         if ls.directed:
@@ -140,6 +146,116 @@ def _compute_expected_value(
         / (denom_direct_factor * total_weight) ** 2
         * (time_factor / network_duration)
     )
+
+
+# Sentinel defaults used by the k-partite mask. A partite id equal to one of
+# these makes the mask asymmetric, which the closed forms cannot reproduce.
+_PARTITE_SENTINELS = (-1, -2)
+
+
+def _closed_form_is_exact(linkstream: LinkStream) -> bool:
+    """Whether the closed-form expectations reproduce the pair loop exactly.
+
+    The k-partite mask is ``partite_mapping.get(a, -1) == partite_mapping.get(b, -2)``,
+    which is symmetric in ``a`` and ``b`` -- and therefore a real grouping the
+    closed form can factor out -- unless some node carries one of the sentinel
+    values itself.
+    """
+    mapping = linkstream.partite_mapping
+    if not mapping:
+        return True
+    return not any(value in _PARTITE_SENTINELS for value in mapping.values())
+
+
+def _partite_groups(
+    nodes: set[int],
+    partite_mapping: dict[int, int],
+) -> list[list[int]]:
+    """Group the mapped nodes by partite; unmapped nodes belong to no group.
+
+    Pairs inside a group are masked out (they contribute nothing), including the
+    diagonal. Unmapped nodes are masked against nothing at all -- not even
+    themselves -- which is why they are simply left out here.
+    """
+    if not partite_mapping:
+        return []
+    groups: dict[int, list[int]] = {}
+    for node in nodes:
+        partite = partite_mapping.get(node)
+        if partite is not None:
+            groups.setdefault(partite, []).append(node)
+    return list(groups.values())
+
+
+def _masked_square(
+    nodes: set[int],
+    weights: dict[int, float],
+    groups: list[list[int]],
+    second_weights: dict[int, float] | None = None,
+) -> float:
+    """Sum of ``w[i] * w2[j]`` over every ordered pair not masked by the grouping.
+
+    The pair loop computes an upper-triangular sum whose ``2 ** (i != j)``
+    multiplier makes it exactly the full ordered sum, and that factors:
+
+        sum over all ordered (i, j)  -  sum over ordered pairs inside a group
+
+    Args:
+        nodes: The community's nodes.
+        weights: Per-node factor for the first element of the pair.
+        groups: Partite groups, from :func:`_partite_groups`.
+        second_weights: Per-node factor for the second element, for directed
+            networks where the two differ. Defaults to ``weights``.
+
+    Returns:
+        The masked sum.
+    """
+    other = weights if second_weights is None else second_weights
+    total = sum(weights[node] for node in nodes) * sum(other[node] for node in nodes)
+    for group in groups:
+        total -= sum(weights[node] for node in group) * sum(other[node] for node in group)
+    return total
+
+
+def _near_rounding_tie(value: float, ndigits: int, tol: float = 1e-4) -> bool:
+    """Whether rounding ``value`` to ``ndigits`` is a coin flip.
+
+    The closed forms divide once at the end where the pair loop divides every
+    term, so the two differ in the last bits. That is invisible except when the
+    exact value sits precisely on a half-way boundary -- which happens for
+    integer-weight networks, whose exact modularity is a rational with a
+    ``2**a * 5**b`` denominator. Those calls fall back to the pair loop.
+
+    The probe ``value * 10 ** ndigits`` has a resolution of its own that degrades
+    as ``ndigits`` grows, so the band widens with it. Once the band would cover
+    the whole interval the probe carries no information and every call falls
+    back.
+    """
+    if not isfinite(value):
+        return False
+    scaled = value * 10**ndigits
+    if not isfinite(scaled):
+        return False
+    band = max(tol, 64 * ulp(scaled))
+    if band >= 0.5:
+        # Cannot tell a tie from anything else; use the exact loop.
+        return True
+    return abs(scaled - floor(scaled) - 0.5) < band
+
+
+def _aggregate_modularity(
+    linkstream: LinkStream,
+    communities_expectations: dict[CommunityLabel, float],
+    communities_nb_interactions: dict[CommunityLabel, float],
+    gamma: float,
+    time_penalty: float,
+) -> float:
+    """Combine the three terms into the (unrounded) longitudinal modularity."""
+    lm_modularity = 0.0
+    for community, expectation in communities_expectations.items():
+        nb_links = communities_nb_interactions.get(community, 0)
+        lm_modularity += nb_links / (2 * linkstream.weight) - gamma * expectation
+    return lm_modularity + time_penalty
 
 
 def _validate_lex(lex: LexType | str) -> LexType:
@@ -231,67 +347,73 @@ def longitudinal_modularity(
 
     # Validate and normalize lex
     lex = _validate_lex(lex)
-    # Handle TimeModules input - use its pre-computed structures
+    # Segments are the compact form of a community: a module covering a long
+    # interval has far more (node, time) members than runs. A TimeModules
+    # already stores them; a raw dict is compressed once, here.
     if isinstance(communities, TimeModules):
-        labels = communities.to_flat_labels()
-        communities_dict = communities.to_communities_dict()
-        communities_nodes: dict[CommunityLabel, set[int]] = {
-            label: set(communities.get_module_nodes(label)) for label in communities.modules
-        }
-        communities_leaves: dict[CommunityLabel, set[Leaf]] = {}
-        for label, members in communities_dict.items():
-            communities_leaves[label] = {
-                linkstream.leaves_dict[key] for key in members if key in linkstream.leaves_dict
-            }
+        communities_segments = communities.segments
     else:
-        # Build labels dict and communities data structures from raw dict
-        labels: LabelsDict = {}
-        communities_nodes: dict[CommunityLabel, set[int]] = {}
-        communities_dict = communities
+        communities_segments = {
+            label: TimeModules._members_to_segments(members)
+            for label, members in communities.items()
+        }
 
-        for label, members in communities.items():
-            communities_nodes[label] = set()
-            for node, time in members:
-                communities_nodes[label].add(node)
-                labels[(node, time)] = label
+    communities_nodes: dict[CommunityLabel, set[int]] = {
+        label: set(segments) for label, segments in communities_segments.items()
+    }
+
+    # Index the labels by Leaf object. Both counting passes below look up the
+    # community of a leaf's neighbours; going through the (node, time) key would
+    # build a fresh tuple for every neighbour of every leaf.
+    leaf_labels = _build_leaf_labels(linkstream, communities_segments)
+
     # 1 - Count intra-community interactions
-    communities_nb_interactions = _count_intra_community_interactions(linkstream, labels)
+    communities_nb_interactions = _count_intra_community_interactions(linkstream, leaf_labels)
+
+    def _expectations_from_loops() -> dict[CommunityLabel, float]:
+        """Fallback pair loops, which need the expanded (node, time) members."""
+        dense = {
+            label: TimeModules._segments_to_members(segments)
+            for label, segments in communities_segments.items()
+        }
+        return _EXPECTATION_LOOPS[lex](
+            linkstream, dense, communities_nodes, _DegreeCache(linkstream)
+        )
 
     # 2 - Compute expectations (LAZY: skip if gamma == 0)
+    use_closed_form = gamma != 0 and _closed_form_is_exact(linkstream)
     if gamma == 0:
         communities_expectations: dict[CommunityLabel, float] = dict.fromkeys(
-            communities_dict, 0.0
+            communities_segments, 0.0
+        )
+    elif use_closed_form:
+        communities_expectations = _EXPECTATION_CLOSED[lex](
+            linkstream, communities_segments, communities_nodes
         )
     else:
-        # Create degree cache for performance
-        degree_cache = _DegreeCache(linkstream)
-
-        expectation_functions = {
-            LexType.CM: _compute_coexistence_expectations,
-            LexType.JM: _compute_joint_expectations,
-            LexType.MM: _compute_mean_expectations,
-        }
-        communities_expectations = expectation_functions[lex](
-            linkstream, communities_dict, communities_nodes, degree_cache
-        )
+        communities_expectations = _expectations_from_loops()
 
     # 3 - Time penalty (LAZY: skip if omega == 0)
     if omega == 0:
         time_penalty = 0.0
     else:
-        switch_count = _count_community_switches(linkstream, labels)
+        switch_count = _count_community_switches(leaf_labels)
         time_penalty = -omega / (2 * linkstream.nb_edges) * switch_count
 
     # 4 - Aggregation
-    lm_modularity = 0.0
-    log_nblinks = 0
-    log_expectations = 0
-    for community, expectation in communities_expectations.items():
-        nb_links = communities_nb_interactions.get(community, 0)
-        log_nblinks += nb_links / 2
-        log_expectations += expectation * linkstream.weight
-        lm_modularity += nb_links / (2 * linkstream.weight) - gamma * expectation
-    lm_modularity += time_penalty
+    lm_modularity = _aggregate_modularity(
+        linkstream, communities_expectations, communities_nb_interactions, gamma, time_penalty
+    )
+
+    # The closed forms divide once where the loops divide per term, so the two
+    # can land on opposite sides of an exact rounding tie. Rare (~0.2% of
+    # integer-weight runs), and only detectable at the rounding boundary -- fall
+    # back to the loops there so the reported value is unchanged.
+    if use_closed_form and _near_rounding_tie(lm_modularity, ndigits):
+        communities_expectations = _expectations_from_loops()
+        lm_modularity = _aggregate_modularity(
+            linkstream, communities_expectations, communities_nb_interactions, gamma, time_penalty
+        )
 
     return ModularityResult(
         value=float(round(lm_modularity, ndigits=ndigits)),
@@ -306,35 +428,129 @@ def longitudinal_modularity(
 # =============================================================================
 
 
+def _build_leaf_labels(
+    linkstream: LinkStream,
+    communities_segments: dict[CommunityLabel, dict[int, tuple[tuple[int, int], ...]]],
+) -> dict[Leaf, CommunityLabel]:
+    """Index community labels by Leaf object rather than by (node, time).
+
+    Only time-nodes that exist in the stream can ever be looked up, so the
+    segments are searched per leaf rather than expanded: a module covering a long
+    interval has far more members than the stream has time-nodes.
+
+    Built in ``leaves_dict`` order so that consumers iterating it visit leaves in
+    the same order as before, which keeps their summation order unchanged.
+
+    Args:
+        linkstream: The temporal network.
+        communities_segments: Mapping from label to per-node inclusive runs.
+
+    Returns:
+        Mapping from Leaf to community label, for the leaves that have one.
+    """
+    # Index the stream's time-nodes by node, sorted, so a run can be turned into
+    # a slice of them by binary search.
+    times_by_node: dict[int, list[int]] = {}
+    leaves_by_node: dict[int, list[Leaf]] = {}
+    for (node, time), leaf in linkstream.leaves_dict.items():
+        times_by_node.setdefault(node, []).append(time)
+        leaves_by_node.setdefault(node, []).append(leaf)
+    for node, times in times_by_node.items():
+        if times != sorted(times):
+            order = sorted(range(len(times)), key=times.__getitem__)
+            times_by_node[node] = [times[i] for i in order]
+            leaves_by_node[node] = [leaves_by_node[node][i] for i in order]
+
+    # Modules can claim the same time-node: on continuous streams a split edge
+    # runs one instant past its gap, so a module's last instant can coincide with
+    # the next module's first. Assigning in iteration order, letting later
+    # modules win, is what the expanded (node, time) form did.
+    assigned: dict[Leaf, CommunityLabel] = {}
+    for label, segments in communities_segments.items():
+        for node, runs in segments.items():
+            times = times_by_node.get(node)
+            if times is None:
+                continue
+            leaves = leaves_by_node[node]
+            for start, end in runs:
+                for index in range(bisect_left(times, start), bisect_right(times, end)):
+                    assigned[leaves[index]] = label
+
+    if not assigned:
+        return {}
+    # Re-emit in leaves_dict order: consumers accumulate per community as they
+    # iterate, so their summation order must not depend on the module order.
+    return {leaf: assigned[leaf] for leaf in linkstream.leaves_dict.values() if leaf in assigned}
+
+
+def _degree_factors(
+    linkstream: LinkStream,
+    nodes: set[int],
+    time_factors: dict[int, float] | None = None,
+) -> tuple[dict[int, float], dict[int, float] | None]:
+    """Per-node weights for the closed forms: degree times its time factor.
+
+    Returns a single mapping for undirected networks, and an (out, in) pair for
+    directed ones, mirroring the two shapes of
+    :meth:`_DegreeCache._compute_contribution`.
+    """
+    if time_factors is None:
+        factor = dict.fromkeys(nodes, 1.0)
+    else:
+        factor = {node: time_factors.get(node, 0) for node in nodes}
+
+    if linkstream.directed:
+        degrees_out = linkstream.degrees_out
+        degrees_in = linkstream.degrees_in
+        return (
+            {node: degrees_out.get(node, 0) * factor[node] for node in nodes},
+            {node: degrees_in.get(node, 0) * factor[node] for node in nodes},
+        )
+    degrees = linkstream.degrees
+    return {node: degrees.get(node, 0) * factor[node] for node in nodes}, None
+
+
+def _scale_expectation(linkstream: LinkStream, total: float, time_factor: float) -> float:
+    """Apply the normalisation of :func:`_compute_expected_value` once."""
+    denom_direct_factor = 2 ** (not linkstream.directed)
+    return (
+        total
+        / (denom_direct_factor * linkstream.weight) ** 2
+        * (time_factor / linkstream.network_duration)
+    )
+
+
 def _count_intra_community_interactions(
     linkstream: LinkStream,
-    labels: LabelsDict,
+    leaf_labels: dict[Leaf, CommunityLabel],
 ) -> dict[CommunityLabel, float]:
     """Count interactions within each community.
 
     Args:
         linkstream: The temporal network.
-        labels: Mapping from (node, time) to community label.
+        leaf_labels: Mapping from Leaf to community label.
 
     Returns:
         Dictionary mapping community labels to interaction counts.
     """
     communities_nb_interactions: dict[CommunityLabel, float] = {}
+    directed = linkstream.directed
+    get = leaf_labels.get
 
-    for (node, time), leaf in linkstream.leaves_dict.items():
-        community = labels.get((node, time))
-        if community is None:
-            continue
+    for leaf, community in leaf_labels.items():
         if community not in communities_nb_interactions:
             communities_nb_interactions[community] = 0
-        neighbors = leaf.topo_neighbors
-        for neighbor in neighbors:
-            neighbor_key = (neighbor.target.node, neighbor.target.time)
-            if labels.get(neighbor_key) != community:
+        total = communities_nb_interactions[community]
+        for neighbor in leaf.topo_neighbors:
+            target = neighbor.target
+            if get(target) != community:
                 continue
             # Avoid double count self-loops to remain consistant with other interactions already counted twice
-            weight_multiplier = 2 if neighbor.target == leaf and not linkstream.directed else 1
-            communities_nb_interactions[community] += weight_multiplier * neighbor.weight
+            if target is leaf and not directed:
+                total += 2 * neighbor.weight
+            else:
+                total += neighbor.weight
+        communities_nb_interactions[community] = total
 
     # NOTE reformulate that maybe
     if linkstream.directed:
@@ -481,8 +697,7 @@ def _compute_coexistence_expectations(
 
 
 def _count_community_switches(
-    linkstream: LinkStream,
-    labels: LabelsDict,
+    leaf_labels: dict[Leaf, CommunityLabel],
 ) -> float:
     """Count community switches across time.
 
@@ -490,34 +705,146 @@ def _count_community_switches(
     consecutive time steps.
 
     Args:
-        linkstream: The temporal network.
-        labels: Mapping from (node, time) to community label.
+        leaf_labels: Mapping from Leaf to community label.
 
     Returns:
         Number of community switches (divided by 2 to avoid double counting).
     """
     switch_count = 0
+    get = leaf_labels.get
 
-    for (node, time), leaf in linkstream.leaves_dict.items():
-        community = labels.get((node, time))
-        if community is None:
-            continue
-
+    for leaf, community in leaf_labels.items():
         # Check left neighbor
         left_neighbor = leaf.left_time_active_neighbor
-        if left_neighbor:
-            left_key = (left_neighbor.node, left_neighbor.time)
-            left_community = labels.get(left_key)
+        if left_neighbor is not None:
+            left_community = get(left_neighbor)
             if left_community is not None and left_community != community:
                 switch_count += 1
 
         # Check right neighbor
         right_neighbor = leaf.right_time_active_neighbor
-        if right_neighbor:
-            right_key = (right_neighbor.node, right_neighbor.time)
-            right_community = labels.get(right_key)
+        if right_neighbor is not None:
+            right_community = get(right_neighbor)
             if right_community is not None and right_community != community:
                 switch_count += 1
 
     # Switches are counted twice (once from each side)
     return switch_count / 2
+
+
+# =============================================================================
+# Closed-form Expectations
+# =============================================================================
+#
+# The pair loops above sum, over combinations_with_replacement(nodes, 2), a term
+# whose 2 ** (source != target) multiplier makes the upper-triangular sum equal
+# to the full ordered sum. That factors:
+#
+#   undirected:  sum_{i,j} d_i d_j f_i f_j            = (sum_i d_i f_i) ** 2
+#   directed:    sum_{i,j} out_i in_j f_i f_j         = (sum_i out_i f_i)(sum_i in_i f_i)
+#
+# with the k-partite mask removed by subtracting the same quantity per partite
+# group (see _masked_square). f_i is the per-node time factor: sqrt(duration)
+# for MM, 1 for JM. CM's factor depends on the pair, so it is decomposed over
+# time instead: |T_i n T_j| = sum_t [t in T_i][t in T_j].
+#
+# These are O(n) / O(#members) where the loops are O(n**2); they are exact in
+# real arithmetic, and differ from the loops only in floating-point rounding.
+
+
+def _compute_joint_expectations_closed(
+    linkstream: LinkStream,
+    communities_segments: dict[CommunityLabel, dict[int, tuple[tuple[int, int], ...]]],
+    communities_nodes: dict[CommunityLabel, set[int]],
+    degree_cache: _DegreeCache | None = None,
+) -> dict[CommunityLabel, float]:
+    """Closed-form Joint Modularity Expectation (JM). See module notes above."""
+    communities_expectations: dict[CommunityLabel, float] = {}
+    partite_mapping = linkstream.partite_mapping
+
+    for community, members in communities_segments.items():
+        nodes = communities_nodes[community]
+        if not nodes:
+            communities_expectations[community] = 0.0
+            continue
+
+        community_duration = get_module_duration_from_segments(members)
+        weights, second = _degree_factors(linkstream, nodes)
+        groups = _partite_groups(nodes, partite_mapping)
+        total = _masked_square(nodes, weights, groups, second)
+        communities_expectations[community] = _scale_expectation(
+            linkstream, total, community_duration
+        )
+
+    return communities_expectations
+
+
+def _compute_mean_expectations_closed(
+    linkstream: LinkStream,
+    communities_segments: dict[CommunityLabel, dict[int, tuple[tuple[int, int], ...]]],
+    communities_nodes: dict[CommunityLabel, set[int]],
+    degree_cache: _DegreeCache | None = None,
+) -> dict[CommunityLabel, float]:
+    """Closed-form Mean Modularity Expectation (MM). See module notes above."""
+    communities_expectations: dict[CommunityLabel, float] = {}
+    partite_mapping = linkstream.partite_mapping
+
+    for community, members in communities_segments.items():
+        nodes = communities_nodes[community]
+        if not nodes:
+            communities_expectations[community] = 0.0
+            continue
+
+        durations = get_nodes_durations_from_segments(members)
+        # The geometric mean sqrt(D_i * D_j) factors into sqrt(D_i) * sqrt(D_j)
+        roots = {node: durations.get(node, 0) ** 0.5 for node in nodes}
+        weights, second = _degree_factors(linkstream, nodes, roots)
+        groups = _partite_groups(nodes, partite_mapping)
+        total = _masked_square(nodes, weights, groups, second)
+        communities_expectations[community] = _scale_expectation(linkstream, total, 1)
+
+    return communities_expectations
+
+
+def _compute_coexistence_expectations_closed(
+    linkstream: LinkStream,
+    communities_segments: dict[CommunityLabel, dict[int, tuple[tuple[int, int], ...]]],
+    communities_nodes: dict[CommunityLabel, set[int]],
+    degree_cache: _DegreeCache | None = None,
+) -> dict[CommunityLabel, float]:
+    """Closed-form Coexistence Modularity Expectation (CM). See module notes above."""
+    communities_expectations: dict[CommunityLabel, float] = {}
+    partite_mapping = linkstream.partite_mapping
+
+    for community, members in communities_segments.items():
+        nodes = communities_nodes[community]
+        if not nodes:
+            communities_expectations[community] = 0.0
+            continue
+
+        # The coexistence count of a pair is the number of instants where both
+        # appear, so summing over instants avoids the pairwise intersection
+        # entirely -- and the active set only changes at a segment boundary, so
+        # the instants between two boundaries are handled in one step.
+        weights, second = _degree_factors(linkstream, nodes)
+        total = 0.0
+        for length, present in iter_coexistence_spans(members):
+            groups = _partite_groups(present, partite_mapping)
+            total += length * _masked_square(present, weights, groups, second)
+
+        communities_expectations[community] = _scale_expectation(linkstream, total, 1)
+
+    return communities_expectations
+
+
+_EXPECTATION_LOOPS = {
+    LexType.CM: _compute_coexistence_expectations,
+    LexType.JM: _compute_joint_expectations,
+    LexType.MM: _compute_mean_expectations,
+}
+
+_EXPECTATION_CLOSED = {
+    LexType.CM: _compute_coexistence_expectations_closed,
+    LexType.JM: _compute_joint_expectations_closed,
+    LexType.MM: _compute_mean_expectations_closed,
+}

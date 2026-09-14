@@ -73,6 +73,9 @@ def move_submodule(
     to_module.submodules.append(submodule)
     to_module.leaves |= submodule.leaves
     submodule.parent = to_module
+    # Both modules' leaves changed, so their memoised durations are stale.
+    from_module.invalidate_durations()
+    to_module.invalidate_durations()
 
 
 def update_fast_iteration_exploration_set(

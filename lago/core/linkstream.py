@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import warnings
+from bisect import bisect_left, bisect_right
 from itertools import pairwise
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -491,7 +492,7 @@ class LinkStream:
             Times must be integers.
         """
         # Track edges to detect duplicates
-        seen_edges: set[tuple[int, int, int, int]] = set()
+        seen_edges: set[tuple] = set()
 
         for link in links:
             if len(link) > 4:
@@ -528,9 +529,14 @@ class LinkStream:
             source_time = self._validate_time(source_time_raw, "source_time")
             target_time = self._validate_time(target_time_raw, "target_time")
 
-            # Check for duplicate edges
+            # Check for duplicate edges.
+            # Undirected: (a, b, t1, t2) and (b, a, t2, t1) are the same temporal
+            # edge, so normalise the (node, time) endpoints as a pair, not the
+            # nodes and the times independently.
             if not self.directed:
-                edge_key = (min(source, target), max(source, target), source_time, target_time)
+                edge_key = tuple(
+                    sorted(((source, source_time), (target, target_time)))
+                )
             else:
                 edge_key = (source, target, source_time, target_time)
             if edge_key in seen_edges:
@@ -594,17 +600,32 @@ class LinkStream:
         old_leaves_items = list(self.leaves_dict.items())
         self.leaves_dict = {}
 
+        # The instants an edge spans are a contiguous slice of the sorted
+        # instants. Both of its bounds were themselves registered as instants
+        # when the link was added, so they are plain lookups, and the loop then
+        # costs one step per split produced. Enumerating the edge's integer
+        # range instead would cost O(duration) per edge -- proportional to the
+        # time span rather than to the work, which is unusable once timestamps
+        # are fine-grained.
+        sorted_instants = sorted(self.time_instants)
+        instant_index = {instant: index for index, instant in enumerate(sorted_instants)}
+        index_of = instant_index.get
+
         for (node, time), leaf in old_leaves_items:
+            # Every edge of this leaf starts here, so resolve the lower bound once.
+            first = index_of(time)
+            if first is None:
+                first = bisect_left(sorted_instants, time)
+
             # Split edges based on time_instants
             for time_edge in leaf.topo_neighbors:
-                # NOTE: This may be a bottleneck for large networks
-                # TODO: Refactor with segments instead of range
-                tmp_time_instants = self.time_instants & set(
-                    range(time, time + time_edge.duration + 1)
-                )
-                tmp_time_instants_sorted = sorted(tmp_time_instants)
+                last = index_of(time + time_edge.duration)
+                if last is None:
+                    last = bisect_right(sorted_instants, time + time_edge.duration) - 1
 
-                for time_start, time_end in pairwise(tmp_time_instants_sorted):
+                for index in range(first, last):
+                    time_start = sorted_instants[index]
+                    time_end = sorted_instants[index + 1]
                     duration = time_end - time_start + 1
                     self._ensure_leaf_exists(node, time_start)
 
@@ -620,13 +641,17 @@ class LinkStream:
                     )
 
             for time_edge in leaf.topo_neighbors_from:
-                tmp_time_instants = self.time_instants & set(
-                    range(time, time + time_edge.duration + 1)
-                )
-                tmp_time_instants_sorted = sorted(tmp_time_instants)
+                last = index_of(time + time_edge.duration)
+                if last is None:
+                    last = bisect_right(sorted_instants, time + time_edge.duration) - 1
 
-                for time_start, time_end in pairwise(tmp_time_instants_sorted):
-                    duration = time_end - time_start
+                for index in range(first, last):
+                    time_start = sorted_instants[index]
+                    time_end = sorted_instants[index + 1]
+                    # Must match the topo_neighbors branch above: an edge and its
+                    # mirror have to carry the same duration, otherwise the two
+                    # endpoints disagree about the same interaction.
+                    duration = time_end - time_start + 1
                     self._ensure_leaf_exists(node, time_start)
 
                     target_node = time_edge.target.node
@@ -648,9 +673,14 @@ class LinkStream:
 
         Links leaves of the same node across consecutive time steps.
         """
-        for node in self.nodes:
-            times = sorted({time for tmp_node, time in self.leaves_dict if tmp_node == node})
-            for tm1, tm2 in pairwise(times):
+        # Group the leaves by node in a single pass. Scanning leaves_dict once
+        # per node instead would be O(nodes x leaves).
+        times_per_node: dict[int, list[int]] = {}
+        for node, time in self.leaves_dict:
+            times_per_node.setdefault(node, []).append(time)
+
+        for node, times in times_per_node.items():
+            for tm1, tm2 in pairwise(sorted(set(times))):
                 self.leaves_dict[(node, tm1)].right_time_active_neighbor = self.leaves_dict[
                     (node, tm2)
                 ]

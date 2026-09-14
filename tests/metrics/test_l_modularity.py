@@ -1147,3 +1147,58 @@ class TestStaticVsLongitudinalEquivalence:
                 f"Large LAGO {lex_type.name}: Q_lago ({Q_lago:.10f}, {n_lago} modules) < Q_gt ({Q_gt:.10f}, {n_gt} modules), lm_lago={lm_lago.value:.10f}, lm_gt={lm_gt.value:.10f}\n"
                 f"  Network ({n} nodes, {len(links)} edges):\n{links_str}"
             )
+
+
+# =============================================================================
+# SECTION 12: k-partite null model
+# =============================================================================
+
+
+class TestKPartiteExpectation:
+    """The null model must be active, and partite-aware, on k-partite networks."""
+
+    @staticmethod
+    def _bipartite() -> tuple[LinkStream, dict]:
+        mapping = {0: 0, 1: 0, 2: 1, 3: 1}
+        ls = LinkStream(partite_mapping=mapping)
+        ls.add_links([(0, 2, 0), (0, 3, 0), (1, 2, 0), (1, 3, 0)])
+        communities = {"A": {(0, 0), (2, 0)}, "B": {(1, 0), (3, 0)}}
+        return ls, communities
+
+    @pytest.mark.parametrize("lex", [LexType.MM, LexType.JM, LexType.CM])
+    def test_expectation_term_is_not_zero(self, lex: LexType) -> None:
+        """gamma must actually subtract something.
+
+        Regression test: the partite check used to compare the source node with
+        itself, so every degree contribution was zero and the null model
+        vanished entirely on k-partite networks.
+        """
+        ls, communities = self._bipartite()
+        with_null = longitudinal_modularity(ls, communities, lex=lex, gamma=1, ndigits=12)
+        without_null = longitudinal_modularity(ls, communities, lex=lex, gamma=0, ndigits=12)
+        assert without_null.value != with_null.value
+
+    def test_cross_partite_pair_contributes(self) -> None:
+        """A pair of nodes in different partites has a non-zero contribution."""
+        from lago.metrics.modularity import _DegreeCache
+
+        ls, _ = self._bipartite()
+        cache = _DegreeCache(ls)
+        assert cache.get_contribution(0, 2) > 0
+
+    def test_same_partite_pair_does_not_contribute(self) -> None:
+        """A pair of nodes in the same partite contributes nothing."""
+        from lago.metrics.modularity import _DegreeCache
+
+        ls, _ = self._bipartite()
+        cache = _DegreeCache(ls)
+        assert cache.get_contribution(0, 1) == 0
+
+    def test_unmapped_nodes_still_contribute(self) -> None:
+        """Nodes absent from partite_mapping are not treated as same-partite."""
+        from lago.metrics.modularity import _DegreeCache
+
+        ls = LinkStream(partite_mapping={0: 0})
+        ls.add_links([(0, 1, 0), (1, 2, 0)])
+        cache = _DegreeCache(ls)
+        assert cache.get_contribution(1, 2) > 0

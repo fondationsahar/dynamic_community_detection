@@ -11,6 +11,13 @@ class Leaf:
         self.node = node
         self.time = time
 
+        # Hash derived from the (node, time) identity rather than from id().
+        # Leaves are unique per (node, time) within a LinkStream, so this keeps
+        # the default identity __eq__ consistent while making the iteration order
+        # of every set of leaves a function of the data instead of of the memory
+        # allocator. That is what makes lago_modules reproducible.
+        self._hash = hash((node, time))
+
         self.left_time_active_neighbor: Leaf | None = None
         self.right_time_active_neighbor: Leaf | None = None
 
@@ -20,6 +27,14 @@ class Leaf:
         self.topo_neighbors_from: set = set()
 
         self.module: _LagoModule | None = None
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    @property
+    def sort_key(self) -> tuple[int, int]:
+        """Stable ordering key, for call sites that need a deterministic order."""
+        return (self.node, self.time)
 
     @property
     def neighbors(self) -> set:

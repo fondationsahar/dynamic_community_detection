@@ -15,6 +15,7 @@ class SingleTimeNodeMover(TimeModuleMover):
         delta_lm_computer: DeltaLongitudinalModularityComputer,
         partite_mapping: dict[int, int],
         stopping_criterion: float = 0.0,
+        rng=None,
     ) -> None:
         super().__init__(
             fast_exploration,
@@ -22,6 +23,7 @@ class SingleTimeNodeMover(TimeModuleMover):
             delta_lm_computer,
             partite_mapping,
             stopping_criterion,
+            rng,
         )
 
     def run(

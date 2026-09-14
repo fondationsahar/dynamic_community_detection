@@ -1,5 +1,3 @@
-import copy
-
 from lago.core.linkstream import LinkStream
 
 from . import lago_tools as lts
@@ -8,9 +6,24 @@ from ._leaf import Leaf
 from .delta_lm import (
     DeltaLongitudinalModularityComputer,
 )
+from .exploration import ExplorationQueue
 from .find_best_move import (
     find_best_module_for_submodule,
 )
+
+
+def _leaf_sort_key(leaf: Leaf) -> tuple[int, int]:
+    """Stable ordering key for a leaf."""
+    return (leaf.node, leaf.time)
+
+
+def _edge_key(leaves) -> tuple[tuple[int, int], ...]:
+    """Stable identity for a time edge, for use as a cache key.
+
+    STEM allocates a throw-away _LagoModule per edge, so id() values are
+    recycled constantly and cannot identify a move.
+    """
+    return tuple(sorted((leaf.node, leaf.time) for leaf in leaves))
 
 
 class SingleTimeEdgeMover:
@@ -23,12 +36,16 @@ class SingleTimeEdgeMover:
         modules: set[_LagoModule],
         delta_lm_computer: DeltaLongitudinalModularityComputer,
         stopping_criterion: float = 0.0,
+        rng=None,
     ) -> None:
         self.linkstream = linkstream  # NOTE Maybe overkill to have it here
         self.fast_exploration = fast_exploration
         self.modules = modules
         self.delta_lm_computer = delta_lm_computer
         self.stopping_criterion = stopping_criterion
+        # None keeps the canonical exploration order; a seeded generator picks
+        # a different, reproducible one (see exploration.ExplorationQueue).
+        self.rng = rng
 
     def run(self, verbose: bool | int = 0) -> float:
         """Single Time Edge Movements refinement strategy:
@@ -79,7 +96,7 @@ class SingleTimeEdgeMover:
                     )
 
             move = False
-            tmp_edges = copy.copy(edges_iterator)
+            tmp_edges = ExplorationQueue(edges_iterator, rng=self.rng)
             inner_loop_iteration = 0
             iteration_moves = 0  # Track moves in this iteration
 
@@ -111,7 +128,11 @@ class SingleTimeEdgeMover:
 
                 child_module = lts.create_module_from_leaves(child_edge)
 
-                neighbors_modules = list(lts.get_neighbors_modules_parents(child_module))
+                # Sorted by creation index: the candidate order decides exact ties
+                # in find_best_module_for_submodule, so it must be deterministic.
+                neighbors_modules = sorted(
+                    lts.get_neighbors_modules_parents(child_module), key=lambda m: m.index
+                )
                 best_module, delta_lm = find_best_module_for_submodule(
                     self.delta_lm_computer,
                     child_module,
@@ -123,10 +144,15 @@ class SingleTimeEdgeMover:
                 if not best_module or not delta_lm:
                     continue
 
-                # Check cache to prevent oscillating moves
-                old_parent_id = id(child_module.parent) if child_module.parent else 0
-                move_key = (id(child_module), old_parent_id, id(best_module))
-                reverse_key = (id(child_module), id(best_module), old_parent_id)
+                # Check cache to prevent oscillating moves.
+                # Keys must identify the move, not the objects: child_module is
+                # freshly allocated for every edge (lago_tools.create_module_from_leaves)
+                # and immediately dropped, so id() values are recycled and a
+                # key built from them collides with unrelated earlier moves.
+                edge_key = _edge_key(child_module.leaves)
+                old_parent_id = child_module.parent.index if child_module.parent else -1
+                move_key = (edge_key, old_parent_id, best_module.index)
+                reverse_key = (edge_key, best_module.index, old_parent_id)
 
                 # If reverse move was made previously, only allow this move if gain is strictly higher
                 if reverse_key in move_cache:
@@ -136,7 +162,7 @@ class SingleTimeEdgeMover:
                         blocked_moves += 1
                         if verbose >= 3:
                             print(
-                                f"[CACHE] Blocked move: Edge[id:{id(child_module)}] from {old_parent_id} to {id(best_module)}, "
+                                f"[CACHE] Blocked move: Edge[{edge_key}] from {old_parent_id} to {best_module.index}, "
                                 f"gain {delta_lm:.6e} <= previous reverse gain {previous_reverse_gain:.6e}"
                             )
                         continue
@@ -145,10 +171,10 @@ class SingleTimeEdgeMover:
                 if verbose >= 3:
                     # Create identifier for the edge/module
                     edge_identifier = (
-                        f"Edge[{len(child_module.leaves)} leaves, id:{id(child_module)}]"
+                        f"Edge[{len(child_module.leaves)} leaves, {edge_key}]"
                     )
                     print(
-                        f"[MOVE] {edge_identifier} from parent {old_parent_id} -> parent {id(best_module)}, delta_lm: {delta_lm:.6e}"
+                        f"[MOVE] {edge_identifier} from parent {old_parent_id} -> parent {best_module.index}, delta_lm: {delta_lm:.6e}"
                     )
 
                 delta_longitudinal_modularity += delta_lm
@@ -215,8 +241,10 @@ class SingleTimeEdgeMover:
             # Add all topological neighbors
             for topo_neighbor in leaf.topo_neighbors:
                 tmp_edge = [leaf, topo_neighbor.target]
-                # Sort to avoid duplicates
-                tmp_edge.sort(key=id)
+                # Sort to avoid duplicates. Ordering on (node, time) rather than
+                # on id() keeps which orientation survives independent of memory
+                # addresses, so the exploration set is reproducible.
+                tmp_edge.sort(key=_leaf_sort_key)
                 stem_iterator.add(tuple(tmp_edge))
 
         if verbose >= 3:
@@ -256,8 +284,8 @@ class SingleTimeEdgeMover:
                 # Add all time edges
                 for topo_neighbor in neighbor.topo_neighbors:
                     new_edge = [neighbor, topo_neighbor.target]
-                    # Sort to avoid duplicates
-                    new_edge.sort(key=id)
+                    # Sort to avoid duplicates (see _build_stem_iterator)
+                    new_edge.sort(key=_leaf_sort_key)
                     other_edges.add(tuple(new_edge))
 
         return other_edges
@@ -273,3 +301,6 @@ class SingleTimeEdgeMover:
             child_module.parent.leaves.remove(leaf)
             leaf.module = affiliation_module
             affiliation_module.leaves.add(leaf)
+        # Both modules' leaves changed, so their memoised durations are stale.
+        child_module.parent.invalidate_durations()
+        affiliation_module.invalidate_durations()

@@ -307,35 +307,155 @@ class TimeModules:
         # Auto-detect and convert segment format to standard format
         raw_modules = self._normalize_input_format(raw_modules)
 
-        self._raw_modules = raw_modules
+        # Segments are the canonical storage. A module spans every instant
+        # between its endpoints, so the (node, time) view of it can be orders of
+        # magnitude larger than the segments themselves -- 41 607 members for
+        # 166 segments on the reference fixture. Everything dense below is built
+        # on demand, so a caller that never asks for it never pays for it.
+        self._segments: dict[int, dict[int, tuple[tuple[int, int], ...]]] = {
+            label: self._members_to_segments(members) for label, members in raw_modules.items()
+        }
 
-        # Build inverted indices for efficient lookups
-        self._node_to_modules: dict[int, dict[int, set[int]]] = defaultdict(
-            lambda: defaultdict(set)
-        )  # node -> {module -> {times}}
+        self._all_modules: set[int] = set(self._segments)
+        self._all_nodes: set[int] = {
+            node for nodes in self._segments.values() for node in nodes
+        }
 
-        self._time_to_nodes: dict[int, dict[int, int]] = defaultdict(
-            dict
-        )  # time -> {node -> module}
+        # Lazily materialised views (see the properties below)
+        self._raw_modules_cache: dict[int, set[tuple[int, int]]] | None = None
+        self._node_to_modules_cache: dict[int, dict[int, set[int]]] | None = None
+        self._time_to_nodes_cache: dict[int, dict[int, int]] | None = None
+        self._module_to_nodes_cache: dict[int, dict[int, set[int]]] | None = None
+        self._all_times_cache: set[int] | None = None
 
-        self._module_to_nodes: dict[int, dict[int, set[int]]] = defaultdict(
-            lambda: defaultdict(set)
-        )  # module -> {node -> {times}}
+    # =========================================================================
+    # Segment storage and the dense views derived from it
+    # =========================================================================
 
-        self._all_nodes: set[int] = set()
-        self._all_times: set[int] = set()
-        self._all_modules: set[int] = set()
+    @classmethod
+    def from_segments(
+        cls,
+        segments: dict[int, dict[int, tuple[tuple[int, int], ...]]],
+    ) -> TimeModules:
+        """Build directly from per-node inclusive ``[start, end]`` runs.
 
-        # Build indices
-        for module_label, members in raw_modules.items():
-            self._all_modules.add(module_label)
-            for node, time in members:
-                self._all_nodes.add(node)
-                self._all_times.add(time)
+        Skips the dense round trip entirely, which is what keeps detection on a
+        long-running stream from materialising one entry per covered instant.
 
-                self._node_to_modules[node][module_label].add(time)
-                self._time_to_nodes[time][node] = module_label
-                self._module_to_nodes[module_label][node].add(time)
+        Args:
+            segments: ``{module: {node: ((start, end), ...)}}``.
+
+        Returns:
+            The TimeModules holding exactly those segments.
+        """
+        instance = cls()
+        instance._segments = {
+            label: {node: tuple(runs) for node, runs in nodes.items() if runs}
+            for label, nodes in segments.items()
+        }
+        instance._all_modules = set(instance._segments)
+        instance._all_nodes = {node for nodes in instance._segments.values() for node in nodes}
+        return instance
+
+    @staticmethod
+    def _members_to_segments(
+        members: set[tuple[int, int]],
+    ) -> dict[int, tuple[tuple[int, int], ...]]:
+        """Compress ``{(node, time)}`` into per-node inclusive ``[start, end]`` runs."""
+        times_per_node: dict[int, list[int]] = {}
+        for node, time in members:
+            times_per_node.setdefault(node, []).append(time)
+
+        segments: dict[int, tuple[tuple[int, int], ...]] = {}
+        for node, times in times_per_node.items():
+            times.sort()
+            runs: list[tuple[int, int]] = []
+            start = previous = times[0]
+            for time in times:
+                if time == previous or time == previous + 1:
+                    previous = time
+                    continue
+                runs.append((start, previous))
+                start = previous = time
+            runs.append((start, previous))
+            segments[node] = tuple(runs)
+        return segments
+
+    @staticmethod
+    def _segments_to_members(
+        segments: dict[int, tuple[tuple[int, int], ...]],
+    ) -> set[tuple[int, int]]:
+        """Expand per-node runs back to ``{(node, time)}``."""
+        members: set[tuple[int, int]] = set()
+        for node, runs in segments.items():
+            for start, end in runs:
+                members.update((node, time) for time in range(start, end + 1))
+        return members
+
+    @property
+    def segments(self) -> dict[int, dict[int, tuple[tuple[int, int], ...]]]:
+        """Canonical storage: ``{module: {node: ((start, end), ...)}}``, inclusive."""
+        return self._segments
+
+    @property
+    def _raw_modules(self) -> dict[int, set[tuple[int, int]]]:
+        """Dense ``{module: {(node, time)}}`` view, expanded on first use."""
+        if self._raw_modules_cache is None:
+            self._raw_modules_cache = {
+                label: self._segments_to_members(nodes) for label, nodes in self._segments.items()
+            }
+        return self._raw_modules_cache
+
+    @property
+    def _module_to_nodes(self) -> dict[int, dict[int, set[int]]]:
+        """``{module: {node: {times}}}``, expanded on first use."""
+        if self._module_to_nodes_cache is None:
+            self._module_to_nodes_cache = {
+                label: {
+                    node: {time for start, end in runs for time in range(start, end + 1)}
+                    for node, runs in nodes.items()
+                }
+                for label, nodes in self._segments.items()
+            }
+        return self._module_to_nodes_cache
+
+    @property
+    def _node_to_modules(self) -> dict[int, dict[int, set[int]]]:
+        """``{node: {module: {times}}}``, expanded on first use."""
+        if self._node_to_modules_cache is None:
+            index: dict[int, dict[int, set[int]]] = defaultdict(lambda: defaultdict(set))
+            for label, nodes in self._segments.items():
+                for node, runs in nodes.items():
+                    times = index[node][label]
+                    for start, end in runs:
+                        times.update(range(start, end + 1))
+            self._node_to_modules_cache = index
+        return self._node_to_modules_cache
+
+    @property
+    def _time_to_nodes(self) -> dict[int, dict[int, int]]:
+        """``{time: {node: module}}``, expanded on first use."""
+        if self._time_to_nodes_cache is None:
+            index: dict[int, dict[int, int]] = defaultdict(dict)
+            for label, nodes in self._segments.items():
+                for node, runs in nodes.items():
+                    for start, end in runs:
+                        for time in range(start, end + 1):
+                            index[time][node] = label
+            self._time_to_nodes_cache = index
+        return self._time_to_nodes_cache
+
+    @property
+    def _all_times(self) -> set[int]:
+        """Every instant covered by any module, expanded on first use."""
+        if self._all_times_cache is None:
+            times: set[int] = set()
+            for nodes in self._segments.values():
+                for runs in nodes.values():
+                    for start, end in runs:
+                        times.update(range(start, end + 1))
+            self._all_times_cache = times
+        return self._all_times_cache
 
     @staticmethod
     def _normalize_input_format(

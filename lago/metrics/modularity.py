@@ -8,6 +8,7 @@ from itertools import combinations_with_replacement
 from math import floor, isfinite, ulp
 from typing import TYPE_CHECKING
 
+from lago import accel
 from lago.core.enums import LexType
 from lago.core.time_modules import TimeModules
 from lago.core.utils import (
@@ -362,13 +363,26 @@ def longitudinal_modularity(
         label: set(segments) for label, segments in communities_segments.items()
     }
 
-    # Index the labels by Leaf object. Both counting passes below look up the
-    # community of a leaf's neighbours; going through the (node, time) key would
-    # build a fresh tuple for every neighbour of every leaf.
-    leaf_labels = _build_leaf_labels(linkstream, communities_segments)
-
-    # 1 - Count intra-community interactions
-    communities_nb_interactions = _count_intra_community_interactions(linkstream, leaf_labels)
+    # 1 - Count intra-community interactions. With a compiled kernel the labels
+    # go into a flat array over the stream's cached topology and one pass counts
+    # both the interactions and the switches of step 3, since both walk the same
+    # time-nodes. Without one -- or on the first scoring of a stream, where the
+    # topology build would cost as much as it saves -- the labels are indexed by
+    # Leaf object (going through the (node, time) key would build a tuple per
+    # neighbour per leaf) and the two Python loops below stay in charge, unchanged.
+    switch_count: float | None = None
+    if accel.should_accelerate(linkstream):
+        topology = accel.build_topology(linkstream)
+        label, community_order = topology.labels_from_segments(communities_segments)
+        intra, switches = accel.count_intra_and_switches(topology, label, len(community_order))
+        scale = 2 if linkstream.directed else 1
+        communities_nb_interactions = {
+            community: intra[index] * scale for index, community in enumerate(community_order)
+        }
+        switch_count = switches / 2
+    else:
+        leaf_labels = _build_leaf_labels(linkstream, communities_segments)
+        communities_nb_interactions = _count_intra_community_interactions(linkstream, leaf_labels)
 
     def _expectations_from_loops() -> dict[CommunityLabel, float]:
         """Fallback pair loops, which need the expanded (node, time) members."""
@@ -397,7 +411,8 @@ def longitudinal_modularity(
     if omega == 0:
         time_penalty = 0.0
     else:
-        switch_count = _count_community_switches(leaf_labels)
+        if switch_count is None:
+            switch_count = _count_community_switches(leaf_labels)
         time_penalty = -omega / (2 * linkstream.nb_edges) * switch_count
 
     # 4 - Aggregation

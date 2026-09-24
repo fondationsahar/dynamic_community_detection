@@ -2,6 +2,22 @@ from ._lago_module import _LagoModule
 
 
 class Leaf:
+    # Fixed layout: a stream of 10**6 time-edges holds ~10**6 of these, and a
+    # __dict__ per instance is the largest single cost in that. It also makes
+    # attribute reads slightly cheaper, which the hot loops do constantly.
+    __slots__ = (
+        "_accel_row",
+        "_hash",
+        "edge_duration",
+        "left_time_active_neighbor",
+        "module",
+        "node",
+        "right_time_active_neighbor",
+        "time",
+        "topo_neighbors",
+        "topo_neighbors_from",
+    )
+
     def __init__(
         self,
         node: int,
@@ -27,6 +43,18 @@ class Leaf:
         self.topo_neighbors_from: set = set()
 
         self.module: _LagoModule | None = None
+
+        # Duration of the interactions carried by this time-node. Every edge
+        # incident to a leaf has the same duration (continuous links are split on
+        # one global set of instants), so it is a property of the leaf; the
+        # LinkStream sets it as it adds edges. 1 for a leaf with no edge yet.
+        self.edge_duration: int = 1
+
+        # Row of this leaf in the flat topology of lago.accel, or -1 before one
+        # is built. Kept on the leaf rather than in a Leaf-keyed dict because
+        # __hash__ above is a Python method, so such a dict costs a Python call
+        # per lookup -- once per edge, which is the whole cost being optimised.
+        self._accel_row: int = -1
 
     def __hash__(self) -> int:
         return self._hash

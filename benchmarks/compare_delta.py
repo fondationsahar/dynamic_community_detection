@@ -71,6 +71,9 @@ def main() -> int:
         return loop_value
 
     Computer._get_expectation_mm_part = shadow
+    # The batch evaluation computes the closed form without this method; the
+    # per-candidate path goes through it on every call.
+    Computer.use_batch = False
 
     print(f"{'stream':20s} {'calls':>9s} {'differ':>9s} {'>tol':>7s} {'max rel':>11s}  ratios")
     worst = 0
@@ -88,6 +91,7 @@ def main() -> int:
         )
 
     Computer._get_expectation_mm_part = _impl
+    Computer.use_batch = True
     print(f"\n{'FAIL' if worst else 'OK'}: {worst} calls differ by more than {args.tol}")
     return 1 if worst else 0
 

@@ -106,6 +106,15 @@ def _init_movers(
         gamma,
         omega,
     )
+    if refinement == "STNM":
+        # The batch evaluation relies on `leaf.module.parent` naming the module
+        # that holds the leaf. STNM breaks that from its second round on:
+        # _update_modules_after_stnm rebinds its `modules` set instead of
+        # mutating the one it shares with the TMM mover, so the two movers then
+        # disagree about which modules are current. The per-candidate path
+        # tests membership on the leaf sets themselves and does not care, so
+        # STNM stays on it -- and its results stay exactly what they were.
+        lm_computer.use_batch = False
     time_module_mover = TimeModuleMover(
         fast_exploration,
         modules,

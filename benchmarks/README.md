@@ -41,6 +41,10 @@ python3.11 benchmarks/compare_matrix.py --ref-dir /tmp/refs --ref-name before
 | `check_determinism.py` | `lago_modules` returns the same partition across repeats (run twice and `diff` to cover separate processes) |
 | `bench_metric.py` | timings for `longitudinal_modularity` |
 | `scale.py` | how cost grows with size, on both axes, at sizes the correctness corpus does not reach |
+| `compare_backends.py` | every compiled variant — metric kernel × compiled core — returns **bit-identical** metric values and identical partitions to pure Python, one subprocess per variant, over random × named streams × lex × parameters |
+| `bench_backends.py` | cold (one call, topology built inside) and warm (repeated) timings per backend, both size axes |
+| `compare_candidates.py` | the batch candidate evaluation (`evaluate_candidates`) against the per-candidate reference (`M0_to_Mx`) on **every call** of real runs: same candidate set, same total per candidate, same winner — exact by default, `--tol 1e-9` for JM on float-weighted streams |
+| `profile_lago.py` | wall-time share per function of `lago_modules`, without cProfile's distortion, at two sizes per shape so that what *grows* stands out |
 
 Two suites in `tests/` cover the same ground fast enough for CI:
 
@@ -69,6 +73,26 @@ small corpus. `deep` is linear; `wide` is not. See §1d of
 
 Default ceiling is 2×10⁵ time-edges (under a minute); `--max-edges` opts into more, with a
 predicted time and memory printed first.
+
+### Backends
+
+The compiled kernel is optional and chosen at import, so the two `*_backends.py` scripts run
+one worker process per importable backend and compare across them. They need the extension
+on the path:
+
+```bash
+PYTHONPATH=$PWD/accel_cython/src python3.11 benchmarks/compare_backends.py -n 4000
+PYTHONPATH=$PWD/accel_cython/src python3.11 benchmarks/bench_backends.py
+```
+
+Values are compared by `float.hex()`, not with a tolerance: the kernels are meant to produce
+the same double, and "close" would hide exactly the reassociation bugs this is looking for.
+See [`docs/ACCELERATED_BACKENDS.md`](../docs/ACCELERATED_BACKENDS.md).
+
+The compiled core (`python3.11 accel_cython/setup_core.py build_ext --inplace`) is picked up
+automatically once built; `LAGO_CORE=python` forces the `.py` sources, which is how
+`compare_backends.py` obtains its pure reference and how any script can be run both ways.
+See [`docs/PERFORMANCE_ROUND2.md`](../docs/PERFORMANCE_ROUND2.md).
 
 ### Two traps these exist to avoid
 

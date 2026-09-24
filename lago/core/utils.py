@@ -55,15 +55,11 @@ def get_module_duration(module_leaves: set[Leaf]) -> float:
     min_time: int | None = None
     max_time: int | None = None
     for leaf in module_leaves:
-        if leaf.topo_neighbors:
-            edge_duration = next(iter(leaf.topo_neighbors)).duration
-        elif leaf.topo_neighbors_from:
-            edge_duration = next(iter(leaf.topo_neighbors_from)).duration
-        else:
+        if not leaf.topo_neighbors and not leaf.topo_neighbors_from:
             continue
 
         start = leaf.time
-        end = start + edge_duration
+        end = start + leaf.edge_duration
         if min_time is None or start < min_time:
             min_time = start
         if max_time is None or end > max_time:
@@ -106,7 +102,8 @@ def leaf_edge_duration(leaf: Leaf) -> int:
 
     All edges incident to a leaf share the same duration: continuous links are
     split on the same global set of time instants, so every edge starting at
-    ``leaf`` ends at the same next instant.
+    ``leaf`` ends at the same next instant. The LinkStream records it on the
+    leaf as it adds edges, so this is an attribute read.
 
     Args:
         leaf: The time-node.
@@ -114,11 +111,7 @@ def leaf_edge_duration(leaf: Leaf) -> int:
     Returns:
         The duration, or 1 for a leaf with no incident edge.
     """
-    if leaf.topo_neighbors:
-        return next(iter(leaf.topo_neighbors)).duration
-    if leaf.topo_neighbors_from:
-        return next(iter(leaf.topo_neighbors_from)).duration
-    return 1
+    return leaf.edge_duration
 
 
 def duration_delta_on_add(leaf: Leaf, contains) -> int:
@@ -146,14 +139,14 @@ def duration_delta_on_add(leaf: Leaf, contains) -> int:
     if has_left:
         if has_right:
             # Two runs merge and the leaf fills the gap between them.
-            return right.time - left.time - leaf_edge_duration(left)
+            return right.time - left.time - left.edge_duration
         # The run ending at `left` now ends at `leaf`.
-        return leaf.time - left.time - leaf_edge_duration(left) + leaf_edge_duration(leaf)
+        return leaf.time - left.time - left.edge_duration + leaf.edge_duration
     if has_right:
         # The run starting at `right` now starts at `leaf`.
         return right.time - leaf.time
     # A new run holding just this leaf.
-    return leaf_edge_duration(leaf)
+    return leaf.edge_duration
 
 
 def duration_delta_on_remove(leaf: Leaf, contains) -> int:
@@ -220,16 +213,10 @@ def get_nodes_durations(module_leaves: set[Leaf]) -> dict[int, float]:
             discard(left_leaf)
             left_time_active_neighbor = left_leaf.left_time_active_neighbor
 
-        # leaf_edge_duration inlined: this is the innermost loop of LAGO
-        if right_leaf.topo_neighbors:
-            edge_duration = next(iter(right_leaf.topo_neighbors)).duration
-        elif right_leaf.topo_neighbors_from:
-            edge_duration = next(iter(right_leaf.topo_neighbors_from)).duration
-        else:
-            edge_duration = 1
-
         # The run covers [left_leaf.time, right_leaf.time + duration of right_leaf)
-        nodes_durations[left_leaf.node] += right_leaf.time - left_leaf.time + edge_duration
+        nodes_durations[left_leaf.node] += (
+            right_leaf.time - left_leaf.time + right_leaf.edge_duration
+        )
 
     return nodes_durations
 

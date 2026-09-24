@@ -128,17 +128,14 @@ class SingleTimeEdgeMover:
 
                 child_module = lts.create_module_from_leaves(child_edge)
 
-                # Sorted by creation index: the candidate order decides exact ties
-                # in find_best_module_for_submodule, so it must be deterministic.
-                neighbors_modules = sorted(
-                    lts.get_neighbors_modules_parents(child_module), key=lambda m: m.index
-                )
-                best_module, delta_lm = find_best_module_for_submodule(
+                # Candidates are the modules owning the edge's neighbours; at
+                # this stage a leaf's module is `leaf.module` itself.
+                best_module, delta_lm, _move_changes = find_best_module_for_submodule(
                     self.delta_lm_computer,
                     child_module,
                     self.linkstream.partite_mapping,
-                    neighbors_modules,
                     stopping_criterion=self.stopping_criterion * self.linkstream.weight,
+                    level="module",
                 )
 
                 if not best_module or not delta_lm:
@@ -184,7 +181,7 @@ class SingleTimeEdgeMover:
                 # Update cache with this move
                 move_cache[move_key] = delta_lm
 
-                self._update_affiliation_after_stem(child_module, best_module)
+                self._update_affiliation_after_stem(child_module, best_module, _move_changes)
 
                 if self.fast_exploration:
                     tmp_edges |= self._update_fast_iteration_exploration_set_for_stem(
@@ -290,17 +287,22 @@ class SingleTimeEdgeMover:
 
         return other_edges
 
-    def _update_affiliation_after_stem(self, child_module, affiliation_module) -> None:
+    def _update_affiliation_after_stem(self, child_module, affiliation_module, changes=None) -> None:
         """Update affiliations after a time edge move.
 
         Args:
             child_module (Module): submodule to change affiliation.
             affiliation_module (_type_): new affiliation module for child_module.
+            changes (MoveChanges, optional): the duration changes the move's
+                evaluation produced, applied to the two modules' memoised
+                durations instead of recomputing them.
         """
         for leaf in child_module.leaves:
             child_module.parent.leaves.remove(leaf)
             leaf.module = affiliation_module
             affiliation_module.leaves.add(leaf)
-        # Both modules' leaves changed, so their memoised durations are stale.
-        child_module.parent.invalidate_durations()
-        affiliation_module.invalidate_durations()
+        # Both modules' leaves changed: bring their memoised aggregates along.
+        lts._refresh_durations(child_module.parent, changes.leaving if changes else None)
+        lts._refresh_durations(affiliation_module, changes.joining if changes else None)
+        child_module.parent.jm_remove(child_module.leaves)
+        affiliation_module.jm_add(child_module.leaves)

@@ -197,6 +197,23 @@ STREAMS = {
 # =============================================================================
 
 
+@pytest.fixture(autouse=True)
+def _per_candidate_path():
+    """Run LAGO on the per-candidate path for every test in this module.
+
+    The tests shadow ``_get_expectation_mm_part`` / ``_get_expectation_jm_part``
+    to see each call; the batch evaluation computes the MM closed form without
+    going through them. The batch path is held to the per-candidate one in
+    ``test_candidate_evaluation.py``.
+    """
+    saved = Computer.use_batch
+    Computer.use_batch = False
+    try:
+        yield
+    finally:
+        Computer.use_batch = saved
+
+
 def _collect_comparisons(stream: LinkStream, **lago_kwargs) -> list[tuple[float, float]]:
     """Run LAGO, returning (production, reference) for every expectation call."""
     original = Computer._get_expectation_mm_part

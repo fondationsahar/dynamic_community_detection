@@ -129,7 +129,7 @@ class TimeModuleMover:
                         f"[LOOP TRACKING] TMM reprocessed modules: {reprocessed}/{len(module_process_count)}, max times: {max_process}"
                     )
 
-                best_module, delta_lm = find_best_module_for_submodule(
+                best_module, delta_lm, _move_changes = find_best_module_for_submodule(
                     self.delta_lm_computer,
                     child_module,
                     self.partite_mapping,
@@ -184,7 +184,7 @@ class TimeModuleMover:
 
                     move_history.append(move_tuple)
 
-                lts.move_submodule(child_module, child_module.parent, best_module)
+                lts.move_submodule(child_module, child_module.parent, best_module, _move_changes)
 
                 # Update cache with this move
                 move_cache[move_key] = delta_lm

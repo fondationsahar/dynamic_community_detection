@@ -179,6 +179,9 @@ class LinkStream:
         target_leaf.topo_neighbors.add(
             TimeEdge(target=source_leaf, weight=weight, duration=duration)
         )
+        # Every edge of a leaf has the same duration, so this is idempotent.
+        source_leaf.edge_duration = duration
+        target_leaf.edge_duration = duration
 
     def _add_edge_directed(
         self,
@@ -201,6 +204,8 @@ class LinkStream:
         target_leaf.topo_neighbors_from.add(
             TimeEdge(target=source_leaf, weight=weight, duration=duration)
         )
+        source_leaf.edge_duration = duration
+        target_leaf.edge_duration = duration
 
     # =========================================================================
     # Main Link Addition Methods
@@ -632,13 +637,14 @@ class LinkStream:
                     target_node = time_edge.target.node
                     self._ensure_leaf_exists(target_node, time_start)
 
-                    self.leaves_dict[(node, time_start)].topo_neighbors.add(
-                        TimeEdge(
-                            target=self.leaves_dict[(target_node, time_start)],
-                            weight=time_edge.weight,
-                            duration=duration,
-                        )
+                    source_leaf = self.leaves_dict[(node, time_start)]
+                    target_leaf = self.leaves_dict[(target_node, time_start)]
+                    source_leaf.topo_neighbors.add(
+                        TimeEdge(target=target_leaf, weight=time_edge.weight, duration=duration)
                     )
+                    # All edges of a split slot share its duration.
+                    source_leaf.edge_duration = duration
+                    target_leaf.edge_duration = duration
 
             for time_edge in leaf.topo_neighbors_from:
                 last = index_of(time + time_edge.duration)
@@ -657,13 +663,13 @@ class LinkStream:
                     target_node = time_edge.target.node
                     self._ensure_leaf_exists(target_node, time_start)
 
-                    self.leaves_dict[(node, time_start)].topo_neighbors_from.add(
-                        TimeEdge(
-                            target=self.leaves_dict[(target_node, time_start)],
-                            weight=time_edge.weight,
-                            duration=duration,
-                        )
+                    source_leaf = self.leaves_dict[(node, time_start)]
+                    target_leaf = self.leaves_dict[(target_node, time_start)]
+                    source_leaf.topo_neighbors_from.add(
+                        TimeEdge(target=target_leaf, weight=time_edge.weight, duration=duration)
                     )
+                    source_leaf.edge_duration = duration
+                    target_leaf.edge_duration = duration
 
         # Recompute time neighbors for the new leaves_dict
         self._compute_time_neighbors()

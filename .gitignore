@@ -7,3 +7,7 @@ dist/
 .DS_Store
 **/.DS_Store
 build/
+# compiled accelerator artefacts (accel_cython/)
+*.so
+*.pyd
+accel_cython/src/*.c

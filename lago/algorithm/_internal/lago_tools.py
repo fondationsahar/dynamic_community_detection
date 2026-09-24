@@ -59,6 +59,7 @@ def move_submodule(
     submodule: _LagoModule,
     from_module: _LagoModule,
     to_module: _LagoModule,
+    changes=None,
 ):
     """Update affiliations of the submodule moving from a module to another.
 
@@ -66,6 +67,9 @@ def move_submodule(
         submodule (Module): Submodule to move
         from_module (Module): Source module from which submodule
         to_module (Module): Target module joined by submodule
+        changes (MoveChanges, optional): the per-node duration changes the
+            evaluation of this move produced, so the two modules' memoised
+            durations can be updated instead of recomputed.
     """
     from_module.submodules.remove(submodule)
     for leaf in submodule.leaves:
@@ -73,9 +77,19 @@ def move_submodule(
     to_module.submodules.append(submodule)
     to_module.leaves |= submodule.leaves
     submodule.parent = to_module
-    # Both modules' leaves changed, so their memoised durations are stale.
-    from_module.invalidate_durations()
-    to_module.invalidate_durations()
+    # Both modules' leaves changed: bring their memoised aggregates along.
+    _refresh_durations(from_module, changes.leaving if changes else None)
+    _refresh_durations(to_module, changes.joining if changes else None)
+    from_module.jm_remove(submodule.leaves)
+    to_module.jm_add(submodule.leaves)
+
+
+def _refresh_durations(module: _LagoModule, changes: dict | None) -> None:
+    """Apply the evaluated duration changes to a module, or drop its memo."""
+    if changes is None:
+        module.invalidate_durations()
+    else:
+        module.apply_duration_changes(changes)
 
 
 def update_fast_iteration_exploration_set(

@@ -1,0 +1,9 @@
+[build-system]
+requires = ["setuptools>=64", "wheel", "Cython>=3.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lago-accel-cython"
+version = "0.1.0"
+description = "Compiled counting kernel for dcd-lago's longitudinal modularity"
+requires-python = ">=3.10"

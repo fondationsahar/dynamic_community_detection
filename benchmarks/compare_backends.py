@@ -99,7 +99,7 @@ def variants() -> list[tuple[str, dict[str, str]]]:
     """The (name, environment) combinations that can be run here.
 
     Two independent dimensions: the metric kernel (``LAGO_ACCEL``) and the core
-    data model (``LAGO_CORE``, compiled when ``setup_core.py`` has been run).
+    data model (``LAGO_CORE``, compiled when ``setup.py build_ext`` has been run).
     ``python`` -- both pure -- is the reference everything else is held to.
     """
     from lago import accel
@@ -131,8 +131,7 @@ def main() -> int:
     print(f"variants under test: {', '.join(name for name, _ in under_test)}")
     if len(under_test) == 1:
         print("  only the pure-Python variant is available; nothing to compare against.")
-        print("  build one with: python -m pip install ./accel_cython")
-        print("  or:             python accel_cython/setup_core.py build_ext --inplace")
+        print("  build them with: python setup.py build_ext --inplace")
         return 1
 
     results = {}

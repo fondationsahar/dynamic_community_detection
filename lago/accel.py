@@ -35,6 +35,7 @@ what holds up the claim that they agree.
 from __future__ import annotations
 
 import contextlib
+import importlib
 import os
 from array import array
 from bisect import bisect_left, bisect_right
@@ -55,9 +56,11 @@ __all__ = [
 ]
 
 # Backends, fastest first. Each exposes ``count_intra_and_switches`` with the
-# signature of _reference_kernel. A Rust/PyO3 backend would be one more line
-# here; see docs/ACCELERATED_BACKENDS.md for why it is not built yet.
-_BACKENDS = (("cython", "lago_accel_cython"),)
+# signature of _reference_kernel. The Cython kernel is built with the package
+# (setup.py) from lago/_accel_kernel.pyx; it is simply absent from a pure
+# install. A Rust/PyO3 backend would be one more line here; see
+# docs/ACCELERATED_BACKENDS.md for why it is not built yet.
+_BACKENDS = (("cython", "lago._accel_kernel"),)
 
 
 # =============================================================================
@@ -352,11 +355,11 @@ def _load_backend() -> tuple[str, Any]:
             names = ", ".join(["python", *known])
             msg = f"LAGO_ACCEL={requested!r}; expected one of: {names}"
             raise ValueError(msg)
-        return requested, __import__(known[requested]).count_intra_and_switches
+        return requested, importlib.import_module(known[requested]).count_intra_and_switches
 
     for name, module_name in _BACKENDS:
         try:
-            module = __import__(module_name)
+            module = importlib.import_module(module_name)
         except ImportError:
             continue
         return name, module.count_intra_and_switches
@@ -374,9 +377,9 @@ def is_accelerated() -> bool:
 def core_name() -> str:
     """``"compiled"`` when the core data model runs as a Cython extension, else ``"python"``.
 
-    The compiled core is built in place by ``accel_cython/setup_core.py`` and
-    picked up by the import system on its own; ``LAGO_CORE=python`` forces the
-    ``.py`` sources.
+    The compiled modules are built with the package (``setup.py``; in a checkout
+    ``python setup.py build_ext --inplace``) and picked up by the import system
+    on their own; ``LAGO_CORE=python`` forces the ``.py`` sources.
     """
     from lago.algorithm._internal import _leaf
 
@@ -388,7 +391,7 @@ def available_backends() -> list[str]:
     found = ["python"]
     for name, module_name in _BACKENDS:
         try:
-            __import__(module_name)
+            importlib.import_module(module_name)
         except ImportError:
             continue
         found.append(name)

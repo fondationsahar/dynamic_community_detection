@@ -10,14 +10,13 @@ authors = [
 ]
 keywords = ["lago", "networks", "temporal networks", "modularity", "structures"]
 
-# Core dependencies - minimal for algorithm-only use
-dependencies = [
-    "numpy>=1.24",
-]
+# The algorithm and the metric depend on the standard library only.
+dependencies = []
 
 [project.optional-dependencies]
 # Visualization extras - for plotting modules
 viz = [
+    "numpy>=1.24",
     "matplotlib>=3.5",
     "scikit-learn>=1.0",
 ]
@@ -36,8 +35,20 @@ Homepage = "https://github.com/fondationsahar/dynamic_community_detection"
 Issues = "https://github.com/fondationsahar/dynamic_community_detection/issues"
 
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+# Cython compiles the hot modules and the metric kernel at build time (setup.py);
+# it is never needed at runtime, and a build without a C compiler still yields
+# a working pure-Python install.
+requires = ["setuptools>=61", "wheel", "Cython>=3.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# The wheel carries the .py sources, the .so built from them, and the Cython
+# declarations -- not the generated C, which belongs to the sdist (MANIFEST.in).
+include-package-data = false
+
+[tool.setuptools.package-data]
+lago = ["*.pxd", "*.pyx"]
+"lago.algorithm._internal" = ["*.pxd"]
 
 [tool.setuptools.packages.find]
 include = ["lago*"]

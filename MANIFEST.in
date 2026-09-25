@@ -1,0 +1,4 @@
+# Source distribution: the Cython declarations and kernel, and the generated C so
+# that an sdist builds with a C compiler alone (Cython is used when present).
+recursive-include lago *.pxd *.pyx *.c
+include LICENSE.txt README.md

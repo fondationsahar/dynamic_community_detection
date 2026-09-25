@@ -19,8 +19,8 @@ LAGO detects communities (modules) that evolve over time in fine-grained tempora
 ## Installation
 
 ```bash
-pip install dcd-lago           # Core library
-pip install dcd-lago[viz]      # With visualization
+pip install dcd-lago           # Core library (no dependencies)
+pip install dcd-lago[viz]      # With visualization (numpy, matplotlib, scikit-learn)
 ```
 
 ## Quick Start
@@ -116,6 +116,16 @@ communities.to_json("results.json")
 | `lex` | `"MM"` | Expectation type: `"MM"`, `"JM"`, or `"CM"` |
 | `omega` | `2.0` | Weight for temporal penalty |
 | `gamma` | `1.0` | Weight for expectation term |
+
+## Performance
+
+Nothing to configure: `pip install dcd-lago` gives the fastest implementation your platform supports.
+
+- From a binary wheel, the hot modules of the search and the metric's counting kernel come compiled (Cython). From a source install they are compiled when a C compiler is available and run as pure Python otherwise. Both give **the same results, bit for bit** — the pure-Python sources are the reference and ship alongside the compiled modules.
+- `lago_modules` is deterministic: the same input and parameters give the same modules, in any process. `seed` selects the exploration order, `nb_iter` tries several orders and keeps the best, and `n_jobs` runs those in parallel processes (memory and platform notes in the docstring).
+- To see what is running: `lago.accel.core_name()` is `"compiled"` or `"python"`, `lago.accel.backend_name` is `"cython"` or `"python"` for the metric kernel. `LAGO_CORE=python` forces the pure sources. In a checkout, `python setup.py build_ext --inplace` builds the compiled modules next to the sources.
+
+Against release 1.1.0: 8× (pure Python) to 12× (compiled) on small streams over every parameter combination, 6–109× on streams of 4k–96k interactions, JM at the speed of MM — see [docs/BENCHMARK_PYPI_VS_CURRENT.md](docs/BENCHMARK_PYPI_VS_CURRENT.md).
 
 ## Documentation
 

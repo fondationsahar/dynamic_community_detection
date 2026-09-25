@@ -24,12 +24,19 @@ Subpackage Access:
 """
 
 import os as _os
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _version
+
+try:
+    __version__ = _version("dcd-lago")
+except _PackageNotFoundError:  # a checkout that was never installed
+    __version__ = "0+unknown"
 
 if _os.environ.get("LAGO_CORE", "").strip().lower() == "python":
     # Import lago's own modules from their .py sources even where a compiled
-    # extension built by accel_cython/setup_core.py sits beside them. The
-    # equivalence harness uses this to hold the compiled core to the Python
-    # one; it has no other purpose.
+    # extension built by setup.py sits beside them. The equivalence harness
+    # uses this to hold the compiled modules to the Python ones; it has no
+    # other purpose.
     import importlib.abc as _abc
     import importlib.machinery as _machinery
     import sys as _sys

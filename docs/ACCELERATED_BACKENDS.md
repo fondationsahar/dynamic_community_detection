@@ -49,7 +49,7 @@ no Python object touched inside the loop.
 
 ```
 lago/accel.py                 flat topology + reference kernel + backend dispatch
-accel_cython/                 the compiled backend (setup.py, src/*.pyx, README)
+lago/_accel_kernel.pyx        the compiled kernel, built with the package (setup.py)
 benchmarks/compare_backends.py   bit-exactness across backends
 benchmarks/bench_backends.py     cold / warm timings across backends
 tests/metrics/test_accel.py      in-process contract tests
@@ -91,7 +91,7 @@ The one arithmetic liberty: the Python accumulator starts as `int 0` and stays a
 exact integer while every weight is an integer; the kernel's is a C `double`.
 They agree exactly while a community's total stays below 2⁵³ ≈ 9 × 10¹⁵.
 
-**Dispatch.** `lago.accel` imports `lago_accel_cython` if it can, else falls
+**Dispatch.** `lago.accel` imports `lago._accel_kernel` if it can, else falls
 back to `_reference_kernel`, a pure-Python transcription that is the contract.
 `LAGO_ACCEL=cython|python` forces a backend; an explicit choice that cannot be
 imported raises rather than silently running something else. Without a compiled
@@ -226,10 +226,13 @@ paths return the same double, so which one served a given call is invisible in t
 
 ## 6b. Since then: the compiled core
 
-Round 2 (`PERFORMANCE_ROUND2.md`) added `accel_cython/setup_core.py`, which compiles the
-package's own hot modules in place in Cython pure-Python mode — including `lago/accel.py`,
-so the topology build of this kernel's cold path is compiled too. It is a separate, optional
-build from the kernel above; `compare_backends.py` now checks the four combinations.
+Round 2 (`PERFORMANCE_ROUND2.md`) compiled the package's own hot modules in Cython
+pure-Python mode — including `lago/accel.py`, so the topology build of this kernel's cold path
+is compiled too. Since the packaging work, one build does everything: the kernel lives at
+`lago/_accel_kernel.pyx` and the root `setup.py` compiles it together with those modules, as
+optional extensions with the `.py` sources as fallback (`pip install .`, or
+`python setup.py build_ext --inplace` in a checkout). The `accel_cython/` folder and the
+`PYTHONPATH` trick are gone. `compare_backends.py` checks the four combinations.
 
 ## 7. The Rust + PyO3 alternative, deferred
 

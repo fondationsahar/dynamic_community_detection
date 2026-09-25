@@ -45,6 +45,7 @@ python3.11 benchmarks/compare_matrix.py --ref-dir /tmp/refs --ref-name before
 | `bench_backends.py` | cold (one call, topology built inside) and warm (repeated) timings per backend, both size axes |
 | `compare_candidates.py` | the batch candidate evaluation (`evaluate_candidates`) against the per-candidate reference (`M0_to_Mx`) on **every call** of real runs: same candidate set, same total per candidate, same winner — exact by default, `--tol 1e-9` for JM on float-weighted streams |
 | `profile_lago.py` | wall-time share per function of `lago_modules`, without cProfile's distortion, at two sizes per shape so that what *grows* stands out |
+| `bench_pypi.py` | the **PyPI release** against this tree (pure and compiled), each in its own process: 27 streams of 7 feature families and 4 sizes up to 96k interactions, all 24 parameter combinations on the small ones, every partition re-scored with the current metric; renders `docs/BENCHMARK_PYPI_VS_CURRENT.md` |
 
 Two suites in `tests/` cover the same ground fast enough for CI:
 
@@ -81,16 +82,16 @@ one worker process per importable backend and compare across them. They need the
 on the path:
 
 ```bash
-PYTHONPATH=$PWD/accel_cython/src python3.11 benchmarks/compare_backends.py -n 4000
-PYTHONPATH=$PWD/accel_cython/src python3.11 benchmarks/bench_backends.py
+python3.11 benchmarks/compare_backends.py -n 4000
+python3.11 benchmarks/bench_backends.py
 ```
 
 Values are compared by `float.hex()`, not with a tolerance: the kernels are meant to produce
 the same double, and "close" would hide exactly the reassociation bugs this is looking for.
 See [`docs/ACCELERATED_BACKENDS.md`](../docs/ACCELERATED_BACKENDS.md).
 
-The compiled core (`python3.11 accel_cython/setup_core.py build_ext --inplace`) is picked up
-automatically once built; `LAGO_CORE=python` forces the `.py` sources, which is how
+The compiled modules and the metric kernel (`python3.11 setup.py build_ext --inplace`) are
+picked up automatically once built; `LAGO_CORE=python` forces the `.py` sources, which is how
 `compare_backends.py` obtains its pure reference and how any script can be run both ways.
 See [`docs/PERFORMANCE_ROUND2.md`](../docs/PERFORMANCE_ROUND2.md).
 

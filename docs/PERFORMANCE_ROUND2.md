@@ -110,7 +110,8 @@ means sequential with a `RuntimeWarning`.
 
 ### Step 5 — the compiled core (identical by construction)
 
-`accel_cython/setup_core.py` compiles a list of the package's own `.py` files in place with
+The root `setup.py` (`python setup.py build_ext --inplace` in a checkout; originally
+`accel_cython/setup_core.py`) compiles a list of the package's own `.py` files in place with
 Cython (pure-Python mode): `_leaf.py` and `_time_edge.py` get a `.pxd` beside them and become
 extension types (C attributes, C `__hash__`); `delta_lm`, `find_best_move`, `lago_tools`,
 `leaf_set`, `stem`, `tmm`, `_lago_module`, `core/utils` and `accel` are compiled as they are,
@@ -121,27 +122,79 @@ monkeypatch its methods. `lago.accel.core_name()` reports which core is in use;
 `benchmarks/compare_backends.py` now runs four variants (metric kernel × core) against pure
 Python: 12 660 × 3 metric values bit-identical, 11/11 partitions identical.
 
-## 3. Behaviours of the original that were preserved, not fixed
+## 3. Behaviours of the original that decide the output — kept, by decision
 
-Each of these would change results if corrected. They are reproduced exactly and flagged in
-the code; whether to fix them is a separate decision.
+The optimisation work surfaced three behaviours of the original code that determine which
+partition the search reaches. Each was reproduced exactly (the equivalence checks would have
+failed otherwise) and is flagged where it lives in the code. **Decision: they stay as they
+are. The output must not change**, and each of these fixes would change it for the
+configurations named below. The descriptions are here so that the decision can be revisited
+with full knowledge, and so that nobody "cleans them up" by accident.
 
-1. **STNM works from a stale module set from its second round on.**
-   `SingleTimeNodeMover._update_modules_after_stnm` *rebinds* `self.modules` to a new set
-   instead of mutating the set it shares with the TMM mover, so the two movers then disagree
-   about which modules are current and `leaf.module.parent` no longer names the module that
-   holds the leaf. The batch evaluation relies on that invariant, so STNM runs stay on the
-   per-candidate reference path (`runner.py`) and keep their results.
-2. **A TMM level after a STEM pass uses neighbour sets computed before the pass.**
-   Candidates come from `compute_neighbors`, run when the level starts; STEM then moves leaves
-   between modules and nothing recomputes. Deriving candidates from the live adjacency
-   changed 6 of 54 corpus partitions, so TMM/STNM levels keep using the recorded sets
-   (`find_best_move.py`); STEM, which recomputes per edge, derives them live.
-3. **On directed streams a reciprocal pair of edges of equal weight and duration counts once
-   in the weight delta.** `_get_weight_diff` iterates `topo_neighbors | topo_neighbors_from`,
-   a set union that merges the two `TimeEdge`s (equal target, weight, duration). The batch
-   path therefore still builds the union on directed streams and skips it only where there
-   is nothing to unite with.
+### 3.1 STNM works from a stale module set from its second round on
+
+*What happens.* The TMM and STNM movers start out sharing one `modules` set
+(`runner._init_movers` hands the same object to both). `SingleTimeNodeMover.
+_update_modules_after_stnm` ends every STNM pass with `self.modules = set(...)` — a *new* set,
+on the STNM object only. From then on the TMM mover updates its own set at the end of each
+level (the new parents become the current modules) while STNM's next pass iterates its copy,
+which still holds the modules of the *previous* level. It re-points every `leaf.module` at a
+throw-away per-leaf module whose parent is one of those old modules, and moves leaves between
+*them*; the TMM level that follows then finds `leaf.module.parent` naming modules that are no
+longer current. Nothing crashes, because the original evaluation always tests membership on
+the leaf sets themselves. Net effect: with `refinement="STNM"` and `refinement_in=True`, the
+refinement keeps refining the level-0 partition rather than the current one.
+
+*What a fix would be.* One line: mutate the shared set in place
+(`self.modules.clear(); self.modules.update(parents)`).
+
+*What it would change.* Only `refinement="STNM"` configurations (the default is STEM). STNM
+would then refine the current level, which should raise L-modularity; it would also let STNM
+take the batch evaluation path, which it cannot today (`runner.py` pins it to the
+per-candidate reference path because the batch path relies on `leaf.module.parent` naming the
+module that holds the leaf).
+
+### 3.2 A TMM level after a STEM pass uses neighbour sets computed before the pass
+
+*What happens.* A TMM level takes a module's candidates from `submodule.neighbors`, filled by
+`compute_neighbors()` at the end of the previous level (`_update_modules`). With
+`refinement_in=True` — the default — a STEM pass runs between two levels and moves leaves
+between modules, and nothing recomputes the neighbours. In the next level a module can
+therefore be missing a candidate it now touches (a candidate it no longer touches is harmless:
+it is evaluated with weight 0 and never wins).
+
+*What a fix would be.* Recompute the neighbours at the start of `TimeModuleMover.run()` —
+O(time-edges) per level, negligible next to the level itself.
+
+*What it would change.* **The default configuration.** More candidates per move means some
+merges are found earlier and the greedy trajectory differs; measured when the candidates were
+derived from the live adjacency during this round: 6 of 54 corpus partitions changed. The
+effect on L-modularity is not guaranteed in sign — a greedy path can end in a different local
+optimum. This is the one item whose correction would move published default results, which is
+why the batch path was made to take the *recorded* neighbour sets on TMM/STNM levels
+(`find_best_move.py`) while STEM, which has always recomputed per edge, derives them live.
+
+### 3.3 On directed streams, a reciprocal pair of equal edges counts once in the weight delta
+
+*What happens.* `_get_weight_diff` sums a leaf's edges over
+`topo_neighbors | topo_neighbors_from`, a *set* union. `TimeEdge` equality is (target,
+weight, duration), so on a directed stream an out-edge u→v and an in-edge v→u at the same
+instant with the same weight and duration are one element of the union and contribute once;
+if their weights differ, both count. The metric (`_count_intra_community_interactions`)
+counts each directed edge once and doubles, so such a pair counts twice there. On directed
+streams that contain reciprocal equal-weight pairs, LAGO therefore optimises a quantity that
+differs slightly from the L-modularity it reports.
+
+*What a fix would be.* Iterate the two edge sets one after the other instead of uniting
+them (which is also cheaper — no set allocation per leaf per move; the batch path already does
+exactly this on undirected streams, where there is nothing to unite with, and keeps the union
+on directed ones precisely to preserve this behaviour). A fix would deserve a test that has
+been missing all along: *sum of accepted deltas == LM(final) − LM(initial)*, which checks all
+three delta terms against the metric at once.
+
+*What it would change.* Only directed streams with reciprocal same-instant pairs of equal
+weight and duration; the delta would become consistent with the metric and partitions on
+such streams could differ.
 
 ## 4. Negative results (measured, then not done)
 
@@ -182,6 +235,10 @@ at 80k and growing is gone (0.6 %); the largest remaining term that scales with 
 On the equivalence corpus (`compare_matrix.py`, small streams): 2.8× against the snapshot
 with the compiled core, 1.1–1.2× pure — small streams are dominated by per-call overheads.
 
+Against the **PyPI release (1.1.0)**, i.e. rounds 1 and 2 together, see
+[`BENCHMARK_PYPI_VS_CURRENT.md`](BENCHMARK_PYPI_VS_CURRENT.md): 27 streams, every parameter
+combination, sizes up to 96k interactions.
+
 `longitudinal_modularity`: the compiled `Leaf` makes its pure-Python path ~1.3× faster
 (Leaf-keyed dict lookups now hash in C). That exposed the kernel's cold-call cost, which the
 topology build did not amortise on a stream scored once; the kernel now starts at the second
@@ -198,7 +255,7 @@ python3.11 benchmarks/compare_candidates.py --refinement STEM,None            # 
 python3.11 benchmarks/compare_candidates.py --lex JM --refinement STEM,None --tol 1e-9
 python3.11 benchmarks/compare_delta.py                           # MM closed form vs pair loop, per call
 python3.11 benchmarks/check_determinism.py --reps 2              # 54/54
-PYTHONPATH=$PWD/accel_cython/src python3.11 benchmarks/compare_backends.py -n 1500   # 4 variants
+python3.11 benchmarks/compare_backends.py -n 1500                # 4 variants: kernel x core
 python3.11 benchmarks/profile_lago.py --sizes wide:30k wide:80k deep:30k
 ```
 
@@ -209,4 +266,4 @@ python3.11 benchmarks/profile_lago.py --sizes wide:30k wide:80k deep:30k
 * `evaluate_candidates` is now ~70 % of the run and is dict/set work per M0 edge; the next
   level is an array representation of the stream (integer leaf ids, CSR adjacency), which is
   the port discussed in `FASTER_LANGUAGE_ANALYSIS.md` §5.
-* The three preserved behaviours of §3, if the decision is to fix them.
+* Not the three behaviours of §3: the decision is to keep the output exactly as it is.

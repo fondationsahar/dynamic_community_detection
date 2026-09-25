@@ -7,7 +7,10 @@ dist/
 .DS_Store
 **/.DS_Store
 build/
-# compiled accelerator artefacts (accel_cython/)
+# compiled modules and the C that Cython generates from lago/ (setup.py)
 *.so
 *.pyd
-accel_cython/src/*.c
+lago/**/*.c
+
+# raw benchmark results (large JSON with partitions); the report lives in docs/
+benchmarks/results/

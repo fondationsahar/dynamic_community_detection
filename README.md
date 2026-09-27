@@ -11,7 +11,7 @@ LAGO detects communities (modules) that evolve over time in fine-grained tempora
 **No time window needed.** Traditional approaches require aggregating interactions into snapshots (e.g., daily or hourly networks), losing temporal precision and forcing you to choose an arbitrary window size. LAGO works directly on the raw timestamped data—no aggregation, no information loss.
 
 <p align="center">
-<img src="img/lmodules_ex.png" alt="Temporal communities example" width="600"/>
+<img src="https://raw.githubusercontent.com/fondationsahar/dynamic_community_detection/main/img/lmodules_ex.png" alt="Temporal communities example" width="600"/>
 <br>
 <em>A link stream with 5 nodes showing two dynamic communities (blue and green) that evolve over time.</em>
 </p>
@@ -125,22 +125,22 @@ Nothing to configure: `pip install dcd-lago` gives the fastest implementation yo
 - `lago_modules` is deterministic: the same input and parameters give the same modules, in any process. `seed` selects the exploration order, `nb_iter` tries several orders and keeps the best, and `n_jobs` runs those in parallel processes (memory and platform notes in the docstring).
 - To see what is running: `lago.accel.core_name()` is `"compiled"` or `"python"`, `lago.accel.backend_name` is `"cython"` or `"python"` for the metric kernel. `LAGO_CORE=python` forces the pure sources. In a checkout, `python setup.py build_ext --inplace` builds the compiled modules next to the sources.
 
-Against release 1.1.0: 8× (pure Python) to 12× (compiled) on small streams over every parameter combination, 6–109× on streams of 4k–96k interactions, JM at the speed of MM — see [docs/BENCHMARK_PYPI_VS_CURRENT.md](docs/BENCHMARK_PYPI_VS_CURRENT.md).
+Against release 1.1.0: 8× (pure Python) to 12× (compiled) on small streams over every parameter combination, 6–109× on streams of 4k–96k interactions, JM at the speed of MM — see [docs/BENCHMARK_PYPI_VS_CURRENT.md](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/BENCHMARK_PYPI_VS_CURRENT.md).
 
 ## Documentation
 
 📖 **Guides**
-- [Getting Started](examples/01_getting_started.md) — Concepts and first steps
-- [API Reference](docs/API_REFERENCE.md) — Complete function documentation
+- [Getting Started](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/01_getting_started.md) — Concepts and first steps
+- [API Reference](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/API_REFERENCE.md) — Complete function documentation
 
-📁 **Examples** ([examples/](examples/))
-- [LinkStream Types](examples/02_linkstream_types.ipynb) — Weighted, directed, continuous, delayed, k-partite networks
-- [Community Detection](examples/03_community_detection.ipynb) — Using `lago_modules` and exploring results
-- [Modularity](examples/04_modularity.ipynb) — Computing and understanding quality scores
-- [Visualization](examples/05_visualization.ipynb) — Creating publication-ready plots
+📁 **Examples** ([examples/](https://github.com/fondationsahar/dynamic_community_detection/tree/main/examples/))
+- [LinkStream Types](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/02_linkstream_types.ipynb) — Weighted, directed, continuous, delayed, k-partite networks
+- [Community Detection](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/03_community_detection.ipynb) — Using `lago_modules` and exploring results
+- [Modularity](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/04_modularity.ipynb) — Computing and understanding quality scores
+- [Visualization](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/05_visualization.ipynb) — Creating publication-ready plots
 
 💡 **Practical Guides**
-- [Real-World Preprocessing](examples/real_world_preprocessing.ipynb) — Working with names and date strings
+- [Real-World Preprocessing](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/real_world_preprocessing.ipynb) — Working with names and date strings
 
 All examples are interactive Jupyter notebooks. Run `jupyter notebook` in the examples folder to get started!
 
@@ -183,6 +183,10 @@ If you use LAGO in your research, please cite:
 
 Questions, suggestions, or issues? Please open a [GitHub issue](https://github.com/fondationsahar/dynamic_community_detection/issues).
 
+## Acknowledgements
+
+We thank [Jean-Loup Guillaume](https://www.univ-larochelle.fr/recherche/la-recherche-universite/nos-talents/jean-loup-guillaume/) for the discussions that helped improve this project.
+
 ## License
 
-MIT License — see [LICENSE.txt](LICENSE.txt)
+MIT License — see [LICENSE.txt](https://github.com/fondationsahar/dynamic_community_detection/blob/main/LICENSE.txt)

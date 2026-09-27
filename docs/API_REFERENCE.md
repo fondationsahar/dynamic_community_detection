@@ -32,6 +32,8 @@ lago_modules(
     verbose: bool | int = 0,
     stopping_criterion: float = 1e-8,
     ndigits_logs: int = 8,
+    seed: int | None = None,
+    n_jobs: int = 1,
 ) -> TimeModules
 ```
 
@@ -50,10 +52,17 @@ lago_modules(
 | `verbose` | `bool \| int` | `0` | Verbosity level: `0`=silent, `1`=progress, `2`=debug. Accepts `bool` for backward compatibility |
 | `stopping_criterion` | `float` | `1e-8` | Convergence threshold |
 | `ndigits_logs` | `int` | `8` | Decimal places for logging |
+| `seed` | `int \| None` | `None` | Selects the exploration order, i.e. which greedy trajectory is followed. Every result is reproducible with or without a seed; different seeds reach different local optima, which `nb_iter` exploits by keeping the best |
+| `n_jobs` | `int` | `1` | Processes over which to spread the `nb_iter` runs (forked copies of this process; same result as `1`). Peak memory grows about linearly with `n_jobs`; workers are silent; sequential fallback where fork is unavailable. See the docstring |
 
 ### Returns
 
 `TimeModules` - Container with detected temporal communities.
+
+### Determinism and performance
+
+- The result is a function of the input and the parameters alone: the same call gives the same modules in any process. `seed` chooses among equally valid greedy trajectories; `nb_iter` tries several and keeps the best; `n_jobs` runs them in parallel.
+- Nothing to configure for speed. From a binary wheel the hot modules come compiled (Cython); from a source install they are compiled when a C compiler is available and run as pure Python otherwise, with identical results. `lago.accel.core_name()` returns `"compiled"` or `"python"`; `lago.accel.backend_name` is `"cython"` or `"python"` for the metric's counting kernel; `LAGO_CORE=python` forces the pure sources.
 
 ### Expectation Types (`lex`)
 

@@ -28,13 +28,15 @@ def _check_viz_dependencies():
     """Check that visualization dependencies are installed."""
     import importlib.util
 
-    missing = []
-
-    if importlib.util.find_spec("matplotlib") is None:
-        missing.append("matplotlib")
-
-    if importlib.util.find_spec("sklearn") is None:
-        missing.append("scikit-learn")
+    # Everything the viz modules import at module level; the names on the
+    # right are the distributions to install (the `viz` extra lists them all).
+    required = (
+        ("numpy", "numpy"),
+        ("pandas", "pandas"),
+        ("matplotlib", "matplotlib"),
+        ("sklearn", "scikit-learn"),
+    )
+    missing = [dist for module, dist in required if importlib.util.find_spec(module) is None]
 
     if missing:
         raise ImportError(

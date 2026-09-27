@@ -1,6 +1,6 @@
 [project]
 name = "dcd-lago"
-version = "1.1.0"
+version = "1.2.0"
 description = "Python implementation of the LAGO method for dynamic community detection on temporal networks"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,6 +9,16 @@ authors = [
     { name="Victor Brabant", email="victorbrabant@gmail.com" }
 ]
 keywords = ["lago", "networks", "temporal networks", "modularity", "structures"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
 
 # The algorithm and the metric depend on the standard library only.
 dependencies = []
@@ -17,6 +27,7 @@ dependencies = []
 # Visualization extras - for plotting modules
 viz = [
     "numpy>=1.24",
+    "pandas>=1.5",
     "matplotlib>=3.5",
     "scikit-learn>=1.0",
 ]
@@ -24,10 +35,13 @@ viz = [
 all = [
     "dcd-lago[viz]",
 ]
-# Development dependencies
+# Development dependencies: tests, lint, and the in-place compiled build
+# (`python setup.py build_ext --inplace`); psutil lets n_jobs cap itself on memory.
 dev = [
     "pytest>=7.0",
     "ruff>=0.1",
+    "Cython>=3.0",
+    "psutil>=5.9",
 ]
 
 [project.urls]

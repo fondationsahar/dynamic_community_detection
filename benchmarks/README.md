@@ -66,7 +66,7 @@ python3.11 benchmarks/compare_matrix.py --ref-dir /tmp/refs --ref-name before
 | `bench_backends.py` | cold (one call, topology built inside) and warm (repeated) timings per backend, both size axes |
 | `compare_candidates.py` | the batch candidate evaluation (`evaluate_candidates`) against the per-candidate reference (`M0_to_Mx`) on **every call** of real runs: same candidate set, same total per candidate, same winner — exact by default, `--tol 1e-9` for JM on float-weighted streams |
 | `profile_lago.py` | wall-time share per function of `lago_modules`, without cProfile's distortion, at two sizes per shape so that what *grows* stands out |
-| `bench_pypi.py` | the **PyPI release** against this tree (pure and compiled), each in its own process: 27 streams of 7 feature families and 4 sizes up to 96k interactions, all 24 parameter combinations on the small ones, every partition re-scored with the current metric; renders `docs/BENCHMARK_PYPI_VS_CURRENT.md` |
+| `bench_pypi.py` | **one release against another**: the PyPI wheel as the baseline, this tree pure and compiled, each in its own process; 27 streams of 7 feature families and 4 sizes up to 96k interactions, all 24 parameter combinations on the small ones, every partition re-scored with this tree's metric; renders `docs/BENCHMARK_<baseline>_VS_<new>.md`, named after the two versions compared (today `BENCHMARK_1.1.0_VS_1.2.0.md`) |
 
 Two suites in `tests/` cover the same ground fast enough for CI:
 

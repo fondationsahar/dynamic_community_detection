@@ -11,7 +11,7 @@ with fewer things to install. The verification behind every item below is in
 - `lago_modules`: 8× (pure Python) to 12× (compiled) faster than 1.1.0 on small
   streams over every parameter combination, 6–109× on streams of 4k–96k
   interactions, and no longer superlinear on wide streams. JM now runs at the
-  speed of MM (it was 8–14× slower). Details: `docs/BENCHMARK_PYPI_VS_CURRENT.md`.
+  speed of MM (it was 8–14× slower). Details: `docs/BENCHMARK_1.1.0_VS_1.2.0.md`.
 - `longitudinal_modularity`: 1.5–2.5× faster in pure Python, 10–70× on repeated
   scoring of the same stream with the compiled kernel.
 

@@ -1,4 +1,8 @@
-"""The PyPI release of dcd-lago against the current tree, on many streams, every parameter combination.
+"""One release of dcd-lago against another, on many streams, every parameter combination.
+
+The baseline is the version installed from PyPI into its own virtualenv; the
+candidate is this tree, measured as pure Python and as compiled. The report is
+named after the two versions (``docs/BENCHMARK_<baseline>_VS_<new>.md``).
 
 Three implementations run the same inputs:
 
@@ -370,8 +374,22 @@ def run_worker(spec_path: str, out_path: str, label: str) -> int:
             flush=True,
         )
 
+    try:
+        from importlib.metadata import version as _dist_version
+
+        dist_version = _dist_version("dcd-lago")
+    except Exception:  # not installed as a distribution
+        dist_version = "unknown"
     Path(out_path).write_text(
-        json.dumps({"label": label, "lago_file": lago.__file__, "python": sys.version, "results": results})
+        json.dumps(
+            {
+                "label": label,
+                "lago_file": lago.__file__,
+                "python": sys.version,
+                "version": dist_version,
+                "results": results,
+            }
+        )
     )
     return 0
 
@@ -379,6 +397,18 @@ def run_worker(spec_path: str, out_path: str, label: str) -> int:
 # =============================================================================
 # Driver
 # =============================================================================
+
+
+def _git_head() -> str:
+    """Short hash of HEAD, or "unknown". Reads no user git configuration."""
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=str(REPO_ROOT), env=env, capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return "unknown"
+    return result.stdout.strip() or "unknown"
 
 
 def _worker_command(python: str, spec: Path, out: Path, label: str) -> list[str]:
@@ -402,7 +432,7 @@ def run(args) -> int:
     jobs.sort(key=lambda job: (streams[job[0]]["tier"], streams[job[0]]["family"], streams[job[0]]["size_rank"]))
 
     spec = RESULTS_DIR / "spec.json"
-    spec.write_text(json.dumps({"streams": streams, "jobs": jobs, "timeout": args.timeout}))
+    spec.write_text(json.dumps({"streams": streams, "jobs": jobs, "timeout": args.timeout, "commit": _git_head()}))
     print(f"{len(streams)} streams, {len(jobs)} runs per implementation, timeout {args.timeout}s each")
 
     if args.limit:
@@ -538,23 +568,36 @@ def report(args) -> int:
     lines: list[str] = []
     out = lines.append
 
-    out("# dcd-lago on PyPI (1.1.0) versus the current tree")
+    # The two releases being compared, by version number: the reader must never
+    # have to guess which side is the one they installed.
+    base = args.baseline_version or sides.get("pypi", {}).get("version") or "baseline"
+    new = args.new_version or (sides.get("pure") or sides.get("compiled") or {}).get("version") or "tree"
+    NP, NC = f"{new} pure", f"{new} compiled"
+    spec_meta = json.loads((RESULTS_DIR / "spec.json").read_text())
+    commit = args.commit or spec_meta.get("commit") or _git_head()
+
+    out(f"# dcd-lago {base} versus {new}")
     out("")
     out(
-        "Same inputs, same parameters, three implementations, each in its own process: the PyPI "
-        "release in its own virtualenv; this tree with `LAGO_CORE=python`; this tree with the "
-        "compiled core and the Cython metric kernel. Every stream is generated once as a list of "
-        "links and handed to each side in the same order. `lago_modules` is timed on a freshly "
-        "built stream; `longitudinal_modularity` is then timed on the result (first call, and "
-        "steady state). Every returned partition is scored with the **current** metric so that "
-        "quality is compared with one yardstick.\n"
+        f"A fixed comparison between two releases. **{base}** is the wheel installed from PyPI into its "
+        f"own virtualenv. **{new}** is this tree at commit `{commit}`, measured twice: as **pure Python** "
+        f"(`LAGO_CORE=python` -- what a source install without a C compiler gets) and **compiled** (the "
+        f"compiled modules and the Cython metric kernel -- what the binary wheels give). The three run in "
+        "separate processes on the same inputs: every stream is generated once as a list of links and "
+        "handed to each side in the same order; `lago_modules` is timed on a freshly built stream, then "
+        "`longitudinal_modularity` on the result (first call, and steady state). Every returned partition "
+        f"is scored with the {new} metric so that quality is compared with one yardstick.\n"
+    )
+    out(
+        "For what to expect today, read [`PERFORMANCE.md`](PERFORMANCE.md) first; this report is the "
+        "evidence behind its numbers.\n"
     )
     out(f"Generated by `benchmarks/bench_pypi.py`; raw results in `{RESULTS_DIR.relative_to(REPO_ROOT) if RESULTS_DIR.is_relative_to(REPO_ROOT) else RESULTS_DIR}`.")
     out("")
     out("Two things to keep in mind when reading the partitions column:")
     out("")
-    out("* the PyPI release is **not deterministic** (its hashing follows memory addresses, bug B3 of "
-        "round 1), so its partition can differ from run to run; the current tree is deterministic;")
+    out(f"* {base} is **not deterministic** (its hashing follows memory addresses, bug B3 of "
+        f"round 1), so its partition can differ from run to run; {new} is deterministic;")
     out("* round 1 fixed nine latent bugs in the search, some of which change the result on "
         "specific inputs (k-partite null model, delayed duplicates, pop-order durations, ...). "
         "\"same partition\" is therefore informative but not required; the L-modularity columns are "
@@ -595,27 +638,27 @@ def report(args) -> int:
     if pure and pypi:
         rm_p, rs_p = ratios(matrix_names, pure), ratios(scale_names, pure)
         rm_c, rs_c = ratios(matrix_names, comp), ratios(scale_names, comp)
-        out(f"* **Speed, `lago_modules`.** Over the {len(rm_p)} matrix-tier runs the PyPI release finished "
-            f"(every parameter combination, 15 streams of 500–2 100 interactions), the tree is "
+        out(f"* **Speed, `lago_modules`.** Over the {len(rm_p)} matrix-tier runs {base} finished "
+            f"(every parameter combination, 15 streams of 500–2 100 interactions), {new} is "
             f"**{_geomean(rm_p):.1f}× faster in pure Python and {_geomean(rm_c):.1f}× with the compiled core** "
             f"(geometric means); the range across parameter combinations is "
             f"{min(_geomean(ratios({s}, pure)) or 1 for s in matrix_names):.0f}–"
             f"{max(_geomean(ratios({s}, pure)) or 1 for s in matrix_names):.0f}× per stream in pure Python. "
             f"On the scale tier (4k–96k interactions, default parameters) the speedup is "
             f"{min(rs_p):.0f}–{max(rs_p):.0f}× pure and {min(rs_c):.0f}–{max(rs_c):.0f}× compiled, and it grows "
-            f"with size on wide streams: the PyPI release is superlinear there, the tree is not.")
+            f"with size on wide streams: {base} is superlinear there, {new} is not.")
     if pypi_timeouts:
-        out(f"* **PyPI timeouts.** {len(pypi_timeouts)} runs did not finish within {json.loads((RESULTS_DIR / 'spec.json').read_text())['timeout']} s: "
+        out(f"* **{base} timeouts.** {len(pypi_timeouts)} runs did not finish within {json.loads((RESULTS_DIR / 'spec.json').read_text())['timeout']} s: "
             + ", ".join(f"`{k[0]} {k[1]}`" for k in pypi_timeouts)
             + ". The two on continuous streams of a few hundred interactions are the oscillation behaviour "
             "fixed in round 1 (moves undone and redone; bug B6, id()-keyed caches), not size.")
-    out(f"* **Quality, by the current metric.** Of {quality_better + quality_equal + quality_worse} runs where both "
-        f"finished, the tree's partition scores higher than PyPI's in {quality_better}, the same (±1e-4) in "
-        f"{quality_equal}, lower in {quality_worse}. The PyPI release is not deterministic, so its numbers are one "
+    out(f"* **Quality, by the {new} metric.** Of {quality_better + quality_equal + quality_worse} runs where both "
+        f"finished, {new}'s partition scores higher than {base}'s in {quality_better}, the same (±1e-4) in "
+        f"{quality_equal}, lower in {quality_worse}. {base} is not deterministic, so its numbers are one "
         f"draw; the differences either way are those of a greedy search taking another path, plus the round-1 "
         f"bug fixes on the inputs they concern.")
-    out(f"* **Same partition as PyPI** in {identical}/{compared} runs (see the caveats above on why this is "
-        f"informative, not required); **pure and compiled tree identical in every run** (last section).")
+    out(f"* **Same partition as {base}** in {identical}/{compared} runs (see the caveats above on why this is "
+        f"informative, not required); **{new} pure and compiled identical in every run** (last section).")
     out("* **Metric.** `longitudinal_modularity` is 1.5–2.5× faster in pure Python and 10–70× faster in steady state "
         "with the compiled core and kernel (section 3).")
     out("")
@@ -635,12 +678,12 @@ def report(args) -> int:
         out("")
         out("`lex` × `refinement` × `fast_exploration` (fast / full) × `refinement_in` (in / out); "
             "`gamma=1`, `omega=2`, `nb_iter=1`, canonical order. Times are `lago_modules` alone. "
-            "L-modularity by the current metric, of the partition each side returned.")
+            f"L-modularity by the {new} metric, of the partition each side returned.")
         out("")
         for s in matrix:
             out(f"### `{s['name']}` — {s['features']}; {s['nodes']} nodes, {s['timesteps']} timesteps, {s['interactions']:,} interactions")
             out("")
-            out("| parameters | PyPI | pure | compiled | pure ÷ PyPI | compiled ÷ PyPI | same partition (pure vs PyPI) | LM PyPI | LM current |")
+            out(f"| parameters | {base} | {NP} | {NC} | {NP} ÷ {base} | {NC} ÷ {base} | same partition as {base} | LM {base} | LM {new} |")
             out("|---|---:|---:|---:|---:|---:|:-:|---:|---:|")
             for config in configs("matrix"):
                 key = (s["name"], config_key(config))
@@ -658,7 +701,7 @@ def report(args) -> int:
         out("")
         out("Geometric means of the speedups over the runs where both sides finished.")
         out("")
-        out("| parameters | runs | pure ÷ PyPI | compiled ÷ PyPI | LM current − LM PyPI (mean) |")
+        out(f"| parameters | runs | {NP} ÷ {base} | {NC} ÷ {base} | LM {new} − LM {base} (mean) |")
         out("|---|---:|---:|---:|---:|")
         for config in configs("matrix"):
             ck = config_key(config)
@@ -679,7 +722,7 @@ def report(args) -> int:
             md = f"{statistics.mean(deltas):+.4f}" if deltas else "—"
             out(f"| `{ck}` | {n} | {gp:.1f}× | {gc:.1f}× | {md} |" if gp and gc else f"| `{ck}` | {n} | — | — | {md} |")
         out("")
-        out("| stream | pure ÷ PyPI | compiled ÷ PyPI | PyPI timeouts |")
+        out(f"| stream | {NP} ÷ {base} | {NC} ÷ {base} | {base} timeouts |")
         out("|---|---:|---:|---:|")
         for s in matrix:
             rp, rc, timeouts = [], [], 0
@@ -708,7 +751,7 @@ def report(args) -> int:
             ck = config_key({"lex": lex, "refinement": "STEM", "fast_exploration": True, "refinement_in": True})
             out(f"### `{lex}`")
             out("")
-            out("| stream | nodes | timesteps | interactions | PyPI | pure | compiled | pure ÷ PyPI | compiled ÷ PyPI | LM PyPI | LM current |")
+            out(f"| stream | nodes | timesteps | interactions | {base} | {NP} | {NC} | {NP} ÷ {base} | {NC} ÷ {base} | LM {base} | LM {new} |")
             out("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
             for s in scale:
                 key = (s["name"], ck)
@@ -727,7 +770,7 @@ def report(args) -> int:
         "stream; *steady* is the mean of repeated scorings (the compiled variant takes the Cython "
         "kernel from the second scoring on).")
     out("")
-    out("| stream | interactions | PyPI first | PyPI steady | pure first | pure steady | compiled first | compiled steady | steady speedup (compiled ÷ PyPI) |")
+    out(f"| stream | interactions | {base} first | {base} steady | {NP} first | {NP} steady | {NC} first | {NC} steady | steady speedup ({NC} ÷ {base}) |")
     out("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     ck = config_key({"lex": "MM", "refinement": "STEM", "fast_exploration": True, "refinement_in": True})
     for s in streams_meta:
@@ -754,20 +797,21 @@ def report(args) -> int:
             if b["status"] == "ok" and c and c["status"] == "ok":
                 total += 1
                 agree += b["fingerprint"] == c["fingerprint"]
-        out("## Consistency of the two variants of the tree")
+        out(f"## Consistency of the two variants of {new}")
         out("")
-        out(f"`pure` and `compiled` returned the identical partition in **{agree}/{total}** runs where both finished"
+        out(f"{NP} and {NC} returned the identical partition in **{agree}/{total}** runs where both finished"
             + (" — as required: the compiled core is the same source." if agree == total else " — **MISMATCH, investigate.**"))
         out("")
 
     out("## Environment")
     out("")
+    display = {"pypi": f"{base} (the PyPI wheel)", "pure": NP, "compiled": NC}
     for label, payload in sides.items():
-        out(f"* `{label}`: `{payload['lago_file']}`, Python {payload['python'].split()[0]}")
+        out(f"* {display.get(label, label)}: `{payload['lago_file']}`, Python {payload['python'].split()[0]}")
     out("* Apple Silicon (8 cores), macOS 26; one process at a time, single-threaded.")
     out("")
 
-    target = REPO_ROOT / "docs" / "BENCHMARK_PYPI_VS_CURRENT.md"
+    target = REPO_ROOT / "docs" / f"BENCHMARK_{base}_VS_{new}.md"
     target.write_text("\n".join(lines))
     print(f"report -> {target}")
     return 0
@@ -783,6 +827,9 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=900, help="per run, seconds")
     ap.add_argument("--only", default="", help="comma-separated subset of pypi,pure,compiled")
     ap.add_argument("--limit", type=int, default=0, help="smoke test: only the first N runs")
+    ap.add_argument("--baseline-version", default="", help="label of the PyPI side (default: what the worker reports)")
+    ap.add_argument("--new-version", default="", help="label of this tree (default: what the worker reports)")
+    ap.add_argument("--commit", default="", help="commit the results were produced at (default: recorded at run time)")
     args = ap.parse_args()
     if args.phase == "run":
         if not args.pypi_python and "pypi" in (args.only or "pypi"):

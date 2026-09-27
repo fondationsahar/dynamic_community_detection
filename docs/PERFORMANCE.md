@@ -3,7 +3,7 @@
 What to expect, how it scales, how to measure it, what is left. How the implementation
 achieves it is in [`ARCHITECTURE.md`](ARCHITECTURE.md); the measurements behind every
 statement here are in [`history/`](history/README.md) and
-[`BENCHMARK_PYPI_VS_CURRENT.md`](BENCHMARK_PYPI_VS_CURRENT.md).
+[`BENCHMARK_1.1.0_VS_1.2.0.md`](BENCHMARK_1.1.0_VS_1.2.0.md).
 
 ## 1. What to expect
 
@@ -19,8 +19,12 @@ Against release 1.1.0, same inputs and parameters, each side in its own process
 
 JM runs at the speed of MM (it was 8–14× slower). Wall time at 80k wide interactions: 60 s
 before this work, 24.5 s pure, 17.8 s compiled. The tree's partition scores at least as
-well as 1.1.0's by the current metric in 80 % of the 380 compared runs; the differences
+well as 1.1.0's by the 1.2.0 metric in 80 % of the 380 compared runs; the differences
 either way are those of a greedy search taking another path, plus the bug fixes of round 1.
+
+The full report, per stream and per parameter combination, is
+[`BENCHMARK_1.1.0_VS_1.2.0.md`](BENCHMARK_1.1.0_VS_1.2.0.md) — a fixed comparison between the two
+releases, not a moving target.
 
 "Compiled" is what a binary wheel gives, or a source install on a machine with a C compiler;
 the pure-Python path is the same source and gives identical results.
@@ -56,7 +60,7 @@ All in [`benchmarks/`](../benchmarks/README.md); each script's docstring is its 
 | `profile_lago.py` | where the wall time of `lago_modules` goes, per function, at two sizes per shape — without cProfile's distortion, so that what *grows* stands out |
 | `scale.py` | how cost grows with size on both axes, up to 10⁶ time-edges (predicts time and memory before a long run) |
 | `bench_backends.py` | the metric, cold (one scoring) and warm (repeated), per backend |
-| `bench_pypi.py` | this tree against the PyPI release, every parameter combination, all stream features; renders `BENCHMARK_PYPI_VS_CURRENT.md` |
+| `bench_pypi.py` | one release against another — the PyPI wheel as the baseline, this tree pure and compiled — every parameter combination, all stream features; renders `BENCHMARK_<baseline>_VS_<new>.md` |
 
 Before trusting a timing: `lago.accel.core_name()` and `lago.accel.backend_name` say which
 implementation ran; `LAGO_CORE=python` and `LAGO_ACCEL=python` force the pure paths.

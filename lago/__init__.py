@@ -15,7 +15,7 @@ Example:
     >>> from lago import LinkStream, lago_modules, LexType
     >>> ls = LinkStream()
     >>> ls.add_links([(0, 1, 0), (1, 2, 1)])
-    >>> modules = lago_modules(ls, lex_type=LexType.MM)
+    >>> modules = lago_modules(ls, lex=LexType.MM)
 
 Subpackage Access:
     >>> from lago.core import LinkStream, TimeModules

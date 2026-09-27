@@ -190,7 +190,7 @@ Questions, suggestions, or issues? Please open a [GitHub issue](https://github.c
 
 ## Acknowledgements
 
-We thank [Jean-Loup Guillaume](https://www.univ-larochelle.fr/recherche/la-recherche-universite/nos-talents/jean-loup-guillaume/) for the discussions that helped improve this project.
+We thank [Jean-Loup Guillaume](http://jlguillaume.free.fr/www/) for the discussions that helped improve this project.
 
 ## License
 

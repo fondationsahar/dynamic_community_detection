@@ -69,7 +69,8 @@ LAGO (Longitudinal Agglomerative Greedy Optimization) finds communities by optim
 ## 🔧 Installation
 
 ```bash
-pip install dcd-lago
+pip install dcd-lago          # the library (no dependencies)
+pip install dcd-lago[viz]     # also the plotting stack, needed by 05_visualization and viz_example
 ```
 
 Or from source:

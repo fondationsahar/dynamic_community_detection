@@ -59,7 +59,7 @@ __all__ = [
 # signature of _reference_kernel. The Cython kernel is built with the package
 # (setup.py) from lago/_accel_kernel.pyx; it is simply absent from a pure
 # install. A Rust/PyO3 backend would be one more line here; see
-# docs/ACCELERATED_BACKENDS.md for why it is not built yet.
+# docs/history/2026-09-metric-kernel.md for why it is not built yet.
 _BACKENDS = (("cython", "lago._accel_kernel"),)
 
 

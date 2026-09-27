@@ -136,7 +136,8 @@ Against release 1.1.0: 8× (pure Python) to 12× (compiled) on small streams ove
 - [Getting Started](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/01_getting_started.md) — Concepts and first steps
 - [API Reference](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/API_REFERENCE.md) — Complete function documentation
 - [Changelog](https://github.com/fondationsahar/dynamic_community_detection/blob/main/CHANGELOG.md) — What changed in each release
-- [Performance notes](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/PERFORMANCE_ROUND2.md) — How the implementation is optimised and verified; [the compiled build](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/ACCELERATED_BACKENDS.md)
+- [How it works](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/ARCHITECTURE.md) — The implementation, its invariants, the compiled build
+- [Performance](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/PERFORMANCE.md) — What to expect, how it scales, how to measure
 
 📁 **Examples** ([examples/](https://github.com/fondationsahar/dynamic_community_detection/tree/main/examples/))
 - [LinkStream Types](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/02_linkstream_types.ipynb) — Weighted, directed, continuous, delayed, k-partite networks
@@ -146,6 +147,7 @@ Against release 1.1.0: 8× (pure Python) to 12× (compiled) on small streams ove
 
 💡 **Practical Guides**
 - [Real-World Preprocessing](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/real_world_preprocessing.ipynb) — Working with names and date strings
+- [Advanced Visualization](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/viz_example.ipynb) — Custom plot configurations
 
 The examples are Jupyter notebooks (Getting Started is a page); run `jupyter notebook` in the examples folder.
 

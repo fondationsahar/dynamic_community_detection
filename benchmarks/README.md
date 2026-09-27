@@ -1,14 +1,35 @@
 # Benchmarks and equivalence harness
 
-Tools for changing LAGO's hot paths without changing its results. See
-[`docs/PERFORMANCE_DIAGNOSIS.md`](../docs/PERFORMANCE_DIAGNOSIS.md) for the analysis these
-came out of.
+Tools for changing LAGO's hot paths without changing its results. How the implementation
+works is in [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md); the analyses these tools came
+out of are in [`docs/history/`](../docs/history/README.md).
 
 Everything runs with the checkout's own `lago` package: `_common.py` pins `sys.path` and
 **fails loudly** if an editable install of `dcd-lago` shadows it, which is easy to hit because
 the shadowing only happens when the working directory does not contain `lago/`.
 
 Requires Python ≥ 3.11.
+
+## Before changing anything: the acceptance checklist
+
+Take a snapshot **before** the change, then run, in this order, after it:
+
+```bash
+python3.11 benchmarks/make_ref.py --out-dir /tmp/refs --name before        # once, before the change
+python3.11 -m pytest -q                                                    # default (compiled if built)
+LAGO_CORE=python python3.11 -m pytest -q                                   # the pure sources
+python3.11 benchmarks/compare_matrix.py --ref-dir /tmp/refs --ref-name before   # identical partitions, 54 configs
+python3.11 benchmarks/compare_candidates.py                                # batch == reference, exact
+python3.11 benchmarks/compare_candidates.py --lex JM --tol 1e-9            # JM on float weights
+python3.11 benchmarks/compare_delta.py                                     # closed form == pair loop, per call
+python3.11 benchmarks/check_determinism.py --reps 2                        # 54/54 stable
+python3.11 benchmarks/compare_backends.py -n 1500                          # every compiled variant == pure
+```
+
+A change that alters arithmetic must also be checked **per call** against an independent
+reference (`tests/algorithm/test_delta_expectations.py` is the model) — see the two traps
+at the end of this page. Only when everything above is green is a timing worth reporting
+(`profile_lago.py`, `scale.py`).
 
 ## Streams
 
@@ -70,7 +91,7 @@ representation.
 
 It earned its keep immediately: it refuted the shape-independent cost model measured on the
 small corpus. `deep` is linear; `wide` is not. See §1d of
-[`docs/FASTER_LANGUAGE_ANALYSIS.md`](../docs/FASTER_LANGUAGE_ANALYSIS.md).
+[`docs/history/2026-09-faster-language-analysis.md`](../docs/history/2026-09-faster-language-analysis.md).
 
 Default ceiling is 2×10⁵ time-edges (under a minute); `--max-edges` opts into more, with a
 predicted time and memory printed first.
@@ -88,12 +109,12 @@ python3.11 benchmarks/bench_backends.py
 
 Values are compared by `float.hex()`, not with a tolerance: the kernels are meant to produce
 the same double, and "close" would hide exactly the reassociation bugs this is looking for.
-See [`docs/ACCELERATED_BACKENDS.md`](../docs/ACCELERATED_BACKENDS.md).
+See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) §7 and, for the design record, [`docs/history/2026-09-metric-kernel.md`](../docs/history/2026-09-metric-kernel.md).
 
 The compiled modules and the metric kernel (`python3.11 setup.py build_ext --inplace`) are
 picked up automatically once built; `LAGO_CORE=python` forces the `.py` sources, which is how
 `compare_backends.py` obtains its pure reference and how any script can be run both ways.
-See [`docs/PERFORMANCE_ROUND2.md`](../docs/PERFORMANCE_ROUND2.md).
+See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) §8.
 
 ### Two traps these exist to avoid
 

@@ -17,7 +17,7 @@ from lago.core.utils import log_debug, log_info
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-# Measured on the representation (docs/FASTER_LANGUAGE_ANALYSIS.md, 1c); used only
+# Measured on the representation (docs/PERFORMANCE.md, section 2); used only
 # to warn before parallel iterations would multiply it.
 _BYTES_PER_TIME_EDGE = 500
 

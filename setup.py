@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 # Compiled by Cython in pure-Python mode: the same .py files, unchanged. The
 # first two have a .pxd beside them (C attributes, C __hash__); the others are
 # compiled as they are, with Python object semantics. Chosen by measurement:
-# docs/PERFORMANCE_ROUND2.md, step 5.
+# docs/ARCHITECTURE.md, section 8.
 COMPILED_MODULES = [
     "lago/algorithm/_internal/_leaf.py",
     "lago/algorithm/_internal/_time_edge.py",

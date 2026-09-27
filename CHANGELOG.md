@@ -45,7 +45,7 @@ and 1.1.0's own results were not reproducible in the first place:
 
 Three behaviours of the original that also decide the output were kept exactly
 as they were, deliberately, and are documented with what a fix would change
-(`docs/PERFORMANCE_ROUND2.md`, section 3).
+(`docs/ARCHITECTURE.md`, section 5).
 
 ### Packaging
 

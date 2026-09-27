@@ -138,7 +138,7 @@ longitudinal_modularity(
 - `value`: Total modularity value
 - `time_penalty`: The time penalty component
 - `modularity_without_penalty`: Value without time penalty
-- `lex_type`: The expectation type used
+- `lex`: The expectation type used
 
 ### Expectation Types (`lex`)
 

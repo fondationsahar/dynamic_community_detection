@@ -1,3 +1,8 @@
+> **Historical.** Written during round 1 of the performance work (diagnosis, the nine bug fixes, the first optimisations, `seed`/`nb_iter`), September 2026, as a working note; kept
+> verbatim as the record and not maintained. The current state of the code is described in
+> [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and [`docs/PERFORMANCE.md`](../PERFORMANCE.md);
+> the verification harness in [`benchmarks/README.md`](../../benchmarks/README.md).
+
 # LAGO performance: diagnosis, changes and verification
 
 **Scope:** speed up `longitudinal_modularity` (`lago/metrics/modularity.py`) and
@@ -35,7 +40,7 @@ Also delivered:
   returned different answers for the same input, the k-partite null model was identically
   zero, the oscillation caches were keyed on recycled memory addresses, delayed duplicate
   detection matched the wrong pairs, and the JM k-partite sum was missing a factor of 2.
-* **A benchmark and equivalence harness** under [`benchmarks/`](../benchmarks/), so this stays
+* **A benchmark and equivalence harness** under [`benchmarks/`](../../benchmarks/), so this stays
   measurable: `check_determinism.py`, `compare_matrix.py` (partition equality),
   `compare_metric.py` (metric equality at scale), `compare_delta.py` (per-call numerical
   equality), `bench_metric.py`, `compare_ref.py`, `make_ref.py`, and `scale.py` (growth on

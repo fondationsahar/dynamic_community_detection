@@ -1,3 +1,8 @@
+> **Historical.** Written during the Cython kernel for `longitudinal_modularity`, between rounds 1 and 2, September 2026, as a working note; kept
+> verbatim as the record and not maintained. The current state of the code is described in
+> [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and [`docs/PERFORMANCE.md`](../PERFORMANCE.md);
+> the verification harness in [`benchmarks/README.md`](../../benchmarks/README.md).
+
 # A compiled backend for `longitudinal_modularity`
 
 ## Scope
@@ -17,7 +22,7 @@ level, not with a tolerance.
 
 ## 1. What is accelerated, and why only that
 
-[`FASTER_LANGUAGE_ANALYSIS.md`](FASTER_LANGUAGE_ANALYSIS.md) §2 made the case
+[`2026-09-faster-language-analysis.md`](2026-09-faster-language-analysis.md) §2 made the case
 that LAGO's greedy loop cannot be "wrapped": its cost is spread across the
 `Leaf` / `_LagoModule` object graph, and a compiled kernel that has to cross the
 Python boundary once per candidate evaluation gains nothing. The one exception
@@ -204,7 +209,7 @@ Also:
 
 * Only `longitudinal_modularity` is faster. `lago_modules` is not, by design of
   the boundary; making it faster is the port discussed in
-  `FASTER_LANGUAGE_ANALYSIS.md` §5.
+  `2026-09-faster-language-analysis.md` §5.
 * The gain is for repeated scoring. A caller who scores each stream exactly
   once should not expect more than ~1.1–1.4×.
 * Integer-weight totals above 2⁵³ would differ in the last bit; no realistic
@@ -226,7 +231,7 @@ paths return the same double, so which one served a given call is invisible in t
 
 ## 6b. Since then: the compiled core
 
-Round 2 (`PERFORMANCE_ROUND2.md`) compiled the package's own hot modules in Cython
+Round 2 (`2026-09-round2.md`) compiled the package's own hot modules in Cython
 pure-Python mode — including `lago/accel.py`, so the topology build of this kernel's cold path
 is compiled too. Since the packaging work, one build does everything: the kernel lives at
 `lago/_accel_kernel.pyx` and the root `setup.py` compiles it together with those modules, as

@@ -1,6 +1,6 @@
 """Exhaustive equivalence check for longitudinal_modularity against a reference.
 
-Sized for the rounding-tie rate documented in docs/PERFORMANCE_DIAGNOSIS.md: a
+Sized for the rounding-tie rate documented in docs/history/2026-09-round1-diagnosis.md: a
 closed-form expectation can land on the other side of an exact half-way tie in
 roughly 0.1-0.3% of integer-weight runs, so a few dozen cases prove nothing.
 Run thousands.

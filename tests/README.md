@@ -9,16 +9,25 @@ tests/
 ├── conftest.py                  # Shared pytest fixtures
 ├── README.md                    # This file
 ├── fixtures/                    # Test data files
-│   └── linkstream.txt          # Sample linkstream for integration tests
+│   └── linkstream.txt          # Sample linkstream (2096 links) for integration tests
 ├── core/                        # Tests for lago.core
 │   ├── test_linkstream.py
 │   ├── test_time_modules.py
-│   └── test_time_modules_network.py
+│   ├── test_time_modules_network.py
+│   ├── test_utils.py
+│   └── test_duration_deltas.py  # O(1) duration updates vs full recomputation, exhaustively
+├── algorithm/                   # Tests for the search itself
+│   ├── test_delta_expectations.py    # MM/JM deltas vs an independent pair-loop reference
+│   ├── test_candidate_evaluation.py  # batch evaluation vs the per-candidate reference, per call
+│   ├── test_incremental_durations.py # maintained aggregates vs recomputation, after every move
+│   ├── test_exploration_order.py     # canonical order, seeds, nb_iter
+│   └── test_parallel_iters.py        # n_jobs == sequential
 ├── metrics/                     # Tests for lago.metrics
-│   └── test_l_modularity.py
+│   ├── test_l_modularity.py
+│   └── test_accel.py            # the compiled kernel vs the Python loops
 ├── integration/                 # End-to-end integration tests
 │   └── test_lago_integration.py
-└── test_viz/                    # Tests for lago.viz
+└── test_viz/                    # Tests for lago.viz (needs dcd-lago[viz])
     ├── test_data_preparation.py
     └── test_utils.py
 ```
@@ -67,6 +76,14 @@ Tests for quality metrics:
   - JM, MM, CM longitudinal expectations
   - Different resolution parameters
 
+### Algorithm and equivalence tests (`tests/algorithm/`, `test_duration_deltas.py`, `test_accel.py`)
+The search has two implementations of most of its arithmetic -- the fast path and a
+reference formulation kept in the code -- and these tests hold them together on every call
+of real runs, over every stream mode (see `docs/ARCHITECTURE.md`). They are what makes an
+optimisation safe to land: exact equality where the operations are the same, a 1e-9 tolerance
+only where a summation order was deliberately changed. `benchmarks/` extends the same checks
+to larger corpora and to a snapshot of the code before a change.
+
 ### Visualization Tests (`tests/test_viz/`)
 Tests for visualization components (requires `dcd-lago[viz]`):
 - **test_data_preparation.py**: Data transformation for plotting
@@ -75,7 +92,7 @@ Tests for visualization components (requires `dcd-lago[viz]`):
 ### Integration Tests (`tests/integration/`)
 End-to-end tests for the full LAGO pipeline:
 - **test_lago_integration.py**: Full workflow tests
-  - Various parameter combinations (lex_type, omega, refinement)
+  - Various parameter combinations (lex, omega, refinement)
   - STEM and STNM refinement strategies
   - Multiple iterations
   - Fast vs exhaustive exploration

@@ -1,3 +1,8 @@
+> **Historical.** Written during the question of porting the core to a faster language, between rounds 1 and 2; its recommendations were carried out in round 2, September 2026, as a working note; kept
+> verbatim as the record and not maintained. The current state of the code is described in
+> [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and [`docs/PERFORMANCE.md`](../PERFORMANCE.md);
+> the verification harness in [`benchmarks/README.md`](../../benchmarks/README.md).
+
 # Should LAGO's core be wrapped in a faster language?
 
 ## Context

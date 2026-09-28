@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/fondationsahar/dynamic_community_detection/blob/main/LICENSE.txt)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-LAGO detects communities (modules) that evolve over time in fine-grained temporal networks (link streams). Unlike static methods, it finds groups that form, merge, split, and dissolve as interactions happen.
+Community detection reveals the hidden structure of a network — groups that interact more among themselves than with the rest — and turns a network too large to read into a small set of groups that can be. LAGO does this for temporal networks (link streams): it finds communities that form, merge, split and dissolve as interactions happen.
 
 **No time window needed.** Traditional approaches require aggregating interactions into snapshots (e.g., daily or hourly networks), losing temporal precision and forcing you to choose an arbitrary window size. LAGO works directly on the raw timestamped data—no aggregation, no information loss.
 

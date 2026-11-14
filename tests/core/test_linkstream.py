@@ -1096,3 +1096,20 @@ class TestIntegration:
 
         assert ls.partite_mapping == mapping
         assert ls.nb_nodes == 6
+
+
+def test_durations_beyond_32_bits() -> None:
+    """A duration past 2**31 - 1 (25 days in milliseconds) is an ordinary input.
+
+    The compiled Leaf stores it as a C integer, which must be 64 bits on every
+    platform -- a C ``long`` is 32 bits on Windows -- so the compiled build
+    accepts exactly what the pure-Python one does.
+    """
+    from lago import lago_modules, longitudinal_modularity
+
+    big = 3_000_000_000
+    ls = LinkStream(continuous=True)
+    ls.add_links([(0, 1, 0, big), (1, 2, 0, big), (0, 2, 5, 10), (2, 3, 7, big)])
+    assert max(leaf.edge_duration for leaf in ls.leaves_dict.values()) == big
+    modules = lago_modules(ls)
+    assert longitudinal_modularity(ls, modules).value == -0.5

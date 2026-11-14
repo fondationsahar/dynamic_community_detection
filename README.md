@@ -23,7 +23,7 @@ pip install dcd-lago           # Core library (no dependencies)
 pip install dcd-lago[viz]      # With visualization (numpy, pandas, matplotlib, scikit-learn)
 ```
 
-No C compiler needed. Compiled wheels are published for CPython 3.11–3.15 on Linux (x86_64 and aarch64, glibc and musl), macOS (Apple Silicon and Intel) and Windows (x64 and ARM64). Everywhere else — PyPy, Pyodide, other architectures — pip installs the pure-Python wheel: same results, somewhat slower (see [Performance](#performance)). Copying the `lago/` sources into a project also works, as pure Python.
+No C compiler needed. Compiled wheels are published for CPython 3.11–3.15 on Linux (x86_64 and aarch64, glibc and musl), macOS (Apple Silicon and Intel) and Windows (x64 and ARM64). Everywhere else — Pyodide, other architectures, PyPy — pip installs the pure-Python wheel. On CPython (Pyodide included) it gives the same results, somewhat slower (see [Performance](#performance)). PyPy runs it too, but may reach a different partition: the search explores candidates in Python's set iteration order, which PyPy implements differently. Copying the `lago/` sources into a project also works, as pure Python.
 
 ## Quick Start
 

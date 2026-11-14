@@ -31,6 +31,10 @@ can install, and where.
   array, an edge or a neighbour outside the arrays) raises `IndexError`, as the
   pure-Python kernel does, instead of reading or writing out of bounds. About 10 % of
   the kernel's own time; not measurable on a whole `longitudinal_modularity` call.
+- Windows, compiled build: a continuous link lasting more than 2³¹ − 1 time units
+  (25 days in milliseconds) raised `OverflowError`, because the compiled time-node
+  stored its duration in a C `long`, which is 32 bits on Windows. It is 64 bits on
+  every platform now, as it already was on Linux and macOS.
 
 ## 1.2.0 — 2026-09-27
 

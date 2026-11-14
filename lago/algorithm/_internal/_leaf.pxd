@@ -18,5 +18,7 @@ cdef class Leaf:
     cdef public set topo_neighbors
     cdef public set topo_neighbors_from
     cdef public object module
-    cdef public long edge_duration
+    # long long, not long: a C long is 32 bits on Windows, and a duration in
+    # milliseconds passes 2**31 at under 25 days.
+    cdef public long long edge_duration
     cdef public long _accel_row

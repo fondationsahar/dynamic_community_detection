@@ -204,7 +204,15 @@ def _run_compared(stream, tol: float = 0.0, **lago_kwargs) -> dict:
             reference = original(computer, submodule, partite_mapping, modules, verbose, stopping_criterion, level)
         finally:
             Computer.use_batch = True
-        if result[0] is not reference[0] or differs(result[1], reference[1]):
+        # Where a tolerance applies, two candidates whose totals agree within it
+        # are a tie that the two summation orders may break either way: a last-
+        # bit difference picks the winner. Which near-tie shows up depends on the
+        # set iteration order the reference sums in, so it differs between
+        # interpreters (PyPy hits one on the weighted stream; CPython does not).
+        # A different winner counts only when its total differs beyond the
+        # tolerance; with tol=0 any different winner counts.
+        tie = tol > 0 and not differs(result[1], reference[1])
+        if (result[0] is not reference[0] and not tie) or differs(result[1], reference[1]):
             stats["winners"] += 1
         return result
 

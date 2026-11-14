@@ -118,6 +118,17 @@ class TestLogging:
 
 
 class TestJobs:
+    """The process count. Fork is assumed available unless a test says otherwise:
+    what is under test is the capping, not the platform this runs on (Windows has
+    no fork, and there every count is 1 -- see test_without_fork_runs_sequentially).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _fork_available(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            lago_module.multiprocessing, "get_all_start_methods", lambda: ["fork", "spawn"]
+        )
+
     def test_validation(self) -> None:
         with pytest.raises(ValueError):
             lago_modules(_undirected(), n_jobs=0)

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.1 — unreleased
+## 1.2.1 — 2026-11-14
 
 Same code paths and the same results as 1.2.0, bit for bit; what changes is what you
 can install, and where.

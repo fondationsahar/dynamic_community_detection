@@ -114,6 +114,11 @@ See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) §7 and, for the design re
 The compiled modules and the metric kernel (`python3.11 setup.py build_ext --inplace`) are
 picked up automatically once built; `LAGO_CORE=python` forces the `.py` sources, which is how
 `compare_backends.py` obtains its pure reference and how any script can be run both ways.
+
+The scripts import the checkout they live in. `LAGO_BENCH_INSTALLED=1` makes them use the
+installed `dcd-lago` instead (and refuse the checkout), which is how the release workflow runs
+`compare_backends.py --require-compiled` against each built wheel; `--require-compiled` fails
+unless the compiled kernel and the compiled core were both found and compared.
 See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) §8.
 
 ### Two traps these exist to avoid

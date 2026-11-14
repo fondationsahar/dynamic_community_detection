@@ -14,10 +14,19 @@ compiled instead.
 
     pip install .                          # wheel for this machine
     python setup.py build_ext --inplace    # in a checkout: a .so beside each .py
+
+Two switches, for whoever builds the release distributions
+(``.github/workflows/wheels.yml``); a plain install needs neither:
+
+    LAGO_PURE=1               no extension modules at all: the py3-none-any wheel,
+                              which pip takes where no binary wheel matches
+    LAGO_REQUIRE_COMPILED=1   a failed compile fails the build instead of falling
+                              back, so a binary wheel cannot ship half compiled
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -48,9 +57,17 @@ COMPILED_MODULES = [
 KERNEL = "lago/_accel_kernel.pyx"
 
 # annotation_typing off: the ": int" hints in signatures stay hints. No
-# fast-math anywhere: the summation order is part of the result.
+# fast-math anywhere: the summation order is part of the result. For the same
+# reason no contraction of a*b+c into a fused multiply-add, which GCC does by
+# default where the target has FMA (aarch64): the kernel only adds today, and
+# -ffp-contract=off keeps it that way whatever it becomes. MSVC's default
+# /fp:precise does not contract. 32-bit x86 is not built for release at all
+# (pyproject.toml): x87 arithmetic keeps a running sum at 80 bits.
 DIRECTIVES = {"language_level": "3", "annotation_typing": False}
-COMPILE_ARGS = [] if sys.platform == "win32" else ["-O3"]
+COMPILE_ARGS = [] if sys.platform == "win32" else ["-O3", "-ffp-contract=off"]
+
+PURE = os.environ.get("LAGO_PURE") == "1"
+REQUIRE_COMPILED = os.environ.get("LAGO_REQUIRE_COMPILED") == "1"
 
 
 def _module_name(source: str) -> str:
@@ -58,6 +75,12 @@ def _module_name(source: str) -> str:
 
 
 def extensions() -> list[Extension]:
+    if PURE and REQUIRE_COMPILED:
+        msg = "LAGO_PURE=1 and LAGO_REQUIRE_COMPILED=1 contradict each other"
+        raise SystemExit(msg)
+    if PURE:
+        return []
+
     sources = [*COMPILED_MODULES, KERNEL]
     try:
         from Cython.Build import cythonize
@@ -77,11 +100,14 @@ def extensions() -> list[Extension]:
             c_file = source.rsplit(".", 1)[0] + ".c"
             if (HERE / c_file).exists():
                 built.append(Extension(_module_name(source), [c_file], extra_compile_args=COMPILE_ARGS))
+            elif REQUIRE_COMPILED:
+                msg = f"LAGO_REQUIRE_COMPILED=1, but neither Cython nor {c_file} is available"
+                raise SystemExit(msg)
 
     for extension in built:
-        # A compile failure must not fail the install: the .py sources are the
-        # fallback and the reference.
-        extension.optional = True
+        # A compile failure must not fail an install: the .py sources are the
+        # fallback and the reference. A release build asks for the opposite.
+        extension.optional = not REQUIRE_COMPILED
     return built
 
 

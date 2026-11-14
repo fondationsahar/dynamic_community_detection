@@ -183,6 +183,26 @@ pure Python. The `.so` files sit beside the `.py` and the import system prefers 
 `LAGO_CORE=python` forces the sources, which is how `benchmarks/compare_backends.py` holds
 the two to each other (bit-identical metric values, identical partitions).
 
+**Release distributions** are built by `.github/workflows/wheels.yml`, never on a workstation:
+a `build/` directory left by an earlier build is packaged as it is, so a wheel built over one
+can carry binaries older than its sources. Two switches in `setup.py` serve the workflow.
+`LAGO_PURE=1` builds no extensions — the `py3-none-any` wheel pip falls back to where no
+binary wheel matches. `LAGO_REQUIRE_COMPILED=1` makes the extensions mandatory, because an
+optional extension that fails leaves a platform-tagged wheel that is partly pure Python;
+`tests/core/test_build.py` (under `LAGO_EXPECT_COMPILED=1`) then checks every module of the
+installed wheel is compiled, and `compare_backends.py --require-compiled` holds it to the
+pure path on every platform built. Not built: 32-bit x86, where x87 arithmetic keeps a
+running sum at 80 bits and the kernel would stop matching the Python loops bit for bit, and
+free-threaded CPython. `-ffp-contract=off` keeps compilers from fusing a multiply-add
+(GCC does by default where the target has FMA, e.g. aarch64).
+
+The kernel runs without Cython's per-access bounds checks and validates its indices itself
+instead — array lengths on entry, each row's label and edge range, each edge target — so
+malformed input to the public `lago.accel.count_intra_and_switches` raises `IndexError`, as
+the pure-Python kernel does, rather than reading or writing outside an array. Measured cost:
+about 10 % of the kernel's own time, nothing outside the noise on a warm
+`longitudinal_modularity` call.
+
 `_LagoModule` stays a Python class on purpose: extension types are immutable and the tests
 monkeypatch its methods. Two things were measured and did not pay: compiling the data model
 alone (the hash calls it made cheap had already been removed by the batch evaluation) and

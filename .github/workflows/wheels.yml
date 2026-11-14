@@ -1,0 +1,195 @@
+# Builds every distribution of a release and tests each one as installed:
+#
+#   binary wheels   cibuildwheel, configured in pyproject.toml [tool.cibuildwheel];
+#                   each built with LAGO_REQUIRE_COMPILED=1 and tested with every
+#                   compiled module asserted present and held bit for bit to the
+#                   pure-Python path
+#   pure wheel      py3-none-any (LAGO_PURE=1), what pip takes where no binary
+#                   wheel matches: PyPy, Pyodide, other architectures
+#   sdist           with the generated C; tested to install both with a compiler
+#                   (compiled) and without one (pure-Python fallback)
+#
+# Publishes to PyPI only from a version tag, through Trusted Publishing (no
+# stored token; PEP 740 attestations), once the `pypi` environment's reviewer
+# approves. A manual run can publish to TestPyPI instead.
+#
+# Actions are pinned to commit SHAs; the comment beside each is its version.
+
+name: Wheels
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - setup.py
+      - pyproject.toml
+      - MANIFEST.in
+      - "lago/**/*.pxd"
+      - "lago/**/*.pyx"
+      - .github/workflows/wheels.yml
+  workflow_dispatch:
+    inputs:
+      testpypi:
+        description: "Publish the built distributions to TestPyPI"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  binary:
+    name: Binary wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest     # manylinux + musllinux, x86_64
+          - ubuntu-24.04-arm  # manylinux + musllinux, aarch64
+          - windows-latest    # AMD64
+          - windows-11-arm    # ARM64
+          - macos-15          # arm64
+          - macos-15-intel    # x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pypa/cibuildwheel@f9b966cfadf4109556cadc5bb39ddb72d0ce664e  # v4.3.5
+        with:
+          output-dir: wheelhouse
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: dist-${{ matrix.os }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  pure:
+    name: Pure-Python wheel and sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Build
+        run: |
+          python -m pip install build==1.6.1
+          python -m build --sdist --outdir dist
+          LAGO_PURE=1 python -m build --wheel --outdir dist
+      - name: Check what each distribution carries
+        run: |
+          python - <<'EOF'
+          import pathlib, tarfile, zipfile
+          dist = pathlib.Path("dist")
+          (wheel,) = dist.glob("*.whl")
+          (sdist,) = dist.glob("*.tar.gz")
+          assert wheel.name.endswith("-py3-none-any.whl"), wheel.name
+          native = [n for n in zipfile.ZipFile(wheel).namelist() if n.endswith((".so", ".pyd", ".c"))]
+          assert not native, f"pure wheel carries {native}"
+          c_files = [n for n in tarfile.open(sdist).getnames() if n.endswith(".c")]
+          assert len(c_files) == 12, f"sdist carries {len(c_files)} generated C files, expected 12"
+          print(wheel.name, "and", sdist.name, "OK")
+          EOF
+      - name: The sdist installs without a C compiler, as pure Python
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -m venv nocc
+          CC=/bin/false nocc/bin/python -m pip install --no-cache-dir "$GITHUB_WORKSPACE"/dist/*.tar.gz
+          nocc/bin/python -c "import lago.accel as a; assert (a.core_name(), a.backend_name) == ('python', 'python'), (a.core_name(), a.backend_name)"
+      - name: The sdist installs with a C compiler, compiled
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -m venv cc
+          LAGO_REQUIRE_COMPILED=1 cc/bin/python -m pip install --no-cache-dir "$GITHUB_WORKSPACE"/dist/*.tar.gz
+          cc/bin/python -c "import lago.accel as a; assert (a.core_name(), a.backend_name) == ('compiled', 'cython'), (a.core_name(), a.backend_name)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: dist-pure
+          path: dist/*
+          if-no-files-found: error
+
+  test-pure:
+    name: Pure wheel on ${{ matrix.python }}
+    needs: pure
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.x", "pypy3.11"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: dist-pure
+          path: dist
+      # From a copy of the tests outside the checkout, as cibuildwheel does for
+      # the binary wheels: `lago` is then the installed wheel, and the fixtures
+      # resolve (the tests open them relative to the working directory).
+      - name: Test the installed wheel
+        working-directory: ${{ runner.temp }}
+        run: |
+          cp -R "$GITHUB_WORKSPACE/tests" tests
+          python -m pip install "$GITHUB_WORKSPACE"/dist/*.whl pytest
+          IGNORE="--ignore=tests/test_viz"
+          if ! python -m pip install --only-binary :all: numpy; then
+            echo "no numpy wheel for this interpreter: skipping the test that uses it as a reference"
+            IGNORE="$IGNORE --ignore=tests/metrics/test_l_modularity.py"
+          fi
+          python -c "import lago, lago.accel as a; assert 'site-packages' in lago.__file__, lago.__file__; assert (a.core_name(), a.backend_name) == ('python', 'python')"
+          python -m pytest tests -q -p no:cacheprovider $IGNORE
+
+  publish:
+    name: Publish to PyPI
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [binary, pure, test-pure]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/dcd-lago/
+    permissions:
+      id-token: write  # Trusted Publishing; nothing else
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - name: The tag names the version being published
+        run: |
+          expected="dcd_lago-${GITHUB_REF_NAME#v}.tar.gz"
+          test -f "dist/$expected" || { echo "tag $GITHUB_REF_NAME, but no dist/$expected:"; ls dist; exit 1; }
+          ls -l dist
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: github.event_name == 'workflow_dispatch' && inputs.testpypi
+    needs: [binary, pure, test-pure]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/dcd-lago/
+    permissions:
+      id-token: write  # Trusted Publishing; nothing else
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3
+        with:
+          repository-url: https://test.pypi.org/legacy/

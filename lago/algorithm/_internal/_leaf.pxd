@@ -1,6 +1,6 @@
 # Cython declarations for _leaf.py (pure-Python mode).
 #
-# With this file beside it, `accel_cython/setup_core.py` compiles _leaf.py into
+# With this file beside it, `setup.py` compiles _leaf.py into
 # an extension type: the attributes become C struct fields and __hash__ becomes
 # a C slot. Without the build, _leaf.py runs unchanged as plain Python. Nothing
 # here changes what the class does -- only how the interpreter reaches it.

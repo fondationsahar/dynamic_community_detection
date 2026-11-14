@@ -4,22 +4,35 @@ Importing this module guarantees that ``lago`` resolves to the checkout this
 file lives in. That matters: an editable install of ``dcd-lago`` may point at a
 different checkout, and it is picked up whenever the current working directory
 does not happen to contain ``lago/``.
+
+``LAGO_BENCH_INSTALLED=1`` asks for the opposite guarantee: ``lago`` is the
+installed package and *not* a checkout's sources. That is how the release
+workflow tests a built wheel (``pyproject.toml``, ``[tool.cibuildwheel]``);
+importing the sources there would compare pure Python with itself and pass.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
+INSTALLED = os.environ.get("LAGO_BENCH_INSTALLED") == "1"
+if not INSTALLED and str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import lago  # noqa: E402
 
 _resolved = Path(lago.__file__).resolve().parent
-if _resolved != REPO_ROOT / "lago":
+if INSTALLED and _resolved == REPO_ROOT / "lago":
+    msg = (
+        f"LAGO_BENCH_INSTALLED=1, but lago resolves to the checkout at {_resolved}. "
+        "Run from outside the checkout, against an installed dcd-lago."
+    )
+    raise RuntimeError(msg)
+if not INSTALLED and _resolved != REPO_ROOT / "lago":
     msg = (
         f"benchmarks imported the wrong package: lago resolves to {_resolved}, "
         f"expected {REPO_ROOT / 'lago'}. An editable install is shadowing this checkout."

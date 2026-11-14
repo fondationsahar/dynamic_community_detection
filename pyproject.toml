@@ -1,6 +1,6 @@
 [project]
 name = "dcd-lago"
-version = "1.2.0"
+version = "1.2.1"
 description = "Python implementation of the LAGO method for dynamic community detection on temporal networks"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Scientific/Engineering",
 ]
 
@@ -39,8 +41,9 @@ all = [
 # (`python setup.py build_ext --inplace`); psutil lets n_jobs cap itself on memory.
 dev = [
     "pytest>=7.0",
+    "numpy>=1.24",  # a reference in tests/metrics/test_l_modularity.py
     "ruff>=0.1",
-    "Cython>=3.0",
+    "Cython>=3.1,<4",
     "psutil>=5.9",
 ]
 
@@ -52,7 +55,7 @@ Issues = "https://github.com/fondationsahar/dynamic_community_detection/issues"
 # Cython compiles the hot modules and the metric kernel at build time (setup.py);
 # it is never needed at runtime, and a build without a C compiler still yields
 # a working pure-Python install.
-requires = ["setuptools>=61", "wheel", "Cython>=3.0"]
+requires = ["setuptools>=61", "wheel", "Cython>=3.1,<4"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -66,6 +69,30 @@ lago = ["*.pxd", "*.pyx"]
 
 [tool.setuptools.packages.find]
 include = ["lago*"]
+
+[tool.cibuildwheel]
+# The release's binary wheels (.github/workflows/wheels.yml). Everything they do
+# not cover -- PyPy, Pyodide, other architectures -- takes the py3-none-any wheel
+# built beside them with LAGO_PURE=1, which is the same code run as Python.
+#
+# Not built: free-threaded CPython (compiled modules would turn the GIL back on,
+# and the search is single-threaded) and 32-bit x86, where x87 arithmetic keeps
+# a running sum at 80 bits and the kernel would stop matching the Python loops
+# bit for bit.
+build = ["cp311-*", "cp312-*", "cp313-*", "cp314-*", "cp315-*"]
+skip = ["cp31?t-*", "*-win32", "*_i686"]
+# A failed compile fails the build: a platform wheel is compiled or not shipped.
+environment = { LAGO_REQUIRE_COMPILED = "1" }
+# Each wheel is tested as installed, from a copy of these outside the checkout:
+# the suite with every compiled module asserted present (tests/core/test_build.py),
+# then the compiled variants held bit for bit to the pure-Python ones.
+test-sources = ["tests", "benchmarks", "setup.py"]
+test-requires = ["pytest", "numpy"]
+test-environment = { LAGO_EXPECT_COMPILED = "1", LAGO_BENCH_INSTALLED = "1" }
+test-command = [
+    "python -m pytest tests -q -p no:cacheprovider --ignore=tests/test_viz",
+    "python benchmarks/compare_backends.py -n 200 --require-compiled",
+]
 
 [tool.ruff]
 target-version = "py311"

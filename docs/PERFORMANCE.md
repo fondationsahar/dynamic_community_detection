@@ -26,8 +26,9 @@ The full report, per stream and per parameter combination, is
 [`BENCHMARK_1.1.0_VS_1.2.0.md`](BENCHMARK_1.1.0_VS_1.2.0.md) — a fixed comparison between the two
 releases, not a moving target.
 
-"Compiled" is what a binary wheel gives, or a source install on a machine with a C compiler;
-the pure-Python path is the same source and gives identical results.
+"Compiled" is what a binary wheel gives (CPython 3.11–3.15 on Linux, macOS and Windows), or a
+source install on a machine with a C compiler; "pure Python" is what the `py3-none-any` wheel
+gives everywhere else. It is the same source and gives identical results.
 
 ## 2. How it scales
 
@@ -80,5 +81,3 @@ In the order I would take them:
    recompute only the nodes whose duration changed; the sorted O(nodes) sum remains.
 4. **STNM on the batch path**, which needs the stale-set behaviour of
    `ARCHITECTURE.md` §5.1 corrected — a decision about outputs, not about speed.
-5. **Compiled wheels for every platform** (`cibuildwheel` in CI); until then Linux,
-   Windows and Intel-Mac users get the sdist, which compiles when a compiler is present.

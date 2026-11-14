@@ -120,6 +120,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("-n", "--cases", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--require-compiled",
+        action="store_true",
+        help="fail unless both the compiled kernel and the compiled core are among the variants",
+    )
     ap.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
@@ -133,6 +138,13 @@ def main() -> int:
         print("  only the pure-Python variant is available; nothing to compare against.")
         print("  build them with: python setup.py build_ext --inplace")
         return 1
+    if args.require_compiled:
+        environments = [environment for _, environment in under_test]
+        if not any(
+            env["LAGO_ACCEL"] != "python" and env["LAGO_CORE"] == "compiled" for env in environments
+        ):
+            print("  --require-compiled: the compiled kernel and core are not both available.")
+            return 1
 
     results = {}
     for name, environment in under_test:

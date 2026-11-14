@@ -15,7 +15,8 @@ tests/
 │   ├── test_time_modules.py
 │   ├── test_time_modules_network.py
 │   ├── test_utils.py
-│   └── test_duration_deltas.py  # O(1) duration updates vs full recomputation, exhaustively
+│   ├── test_duration_deltas.py  # O(1) duration updates vs full recomputation, exhaustively
+│   └── test_build.py            # an installed wheel is compiled throughout (LAGO_EXPECT_COMPILED=1)
 ├── algorithm/                   # Tests for the search itself
 │   ├── test_delta_expectations.py    # MM/JM deltas vs an independent pair-loop reference
 │   ├── test_candidate_evaluation.py  # batch evaluation vs the per-candidate reference, per call
@@ -24,7 +25,7 @@ tests/
 │   └── test_parallel_iters.py        # n_jobs == sequential
 ├── metrics/                     # Tests for lago.metrics
 │   ├── test_l_modularity.py
-│   └── test_accel.py            # the compiled kernel vs the Python loops
+│   └── test_accel.py            # the compiled kernel vs the Python loops; malformed input raises
 ├── integration/                 # End-to-end integration tests
 │   └── test_lago_integration.py
 └── test_viz/                    # Tests for lago.viz (needs dcd-lago[viz])

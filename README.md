@@ -23,6 +23,8 @@ pip install dcd-lago           # Core library (no dependencies)
 pip install dcd-lago[viz]      # With visualization (numpy, pandas, matplotlib, scikit-learn)
 ```
 
+No C compiler needed. Compiled wheels are published for CPython 3.11–3.15 on Linux (x86_64 and aarch64, glibc and musl), macOS (Apple Silicon and Intel) and Windows (x64 and ARM64). Everywhere else — PyPy, Pyodide, other architectures — pip installs the pure-Python wheel: same results, somewhat slower (see [Performance](#performance)). Copying the `lago/` sources into a project also works, as pure Python.
+
 ## Quick Start
 
 ```python
@@ -124,7 +126,7 @@ communities.to_json("results.json")
 
 Nothing to configure: `pip install dcd-lago` gives the fastest implementation your platform supports.
 
-- From a binary wheel, the hot modules of the search and the metric's counting kernel come compiled (Cython). From a source install they are compiled when a C compiler is available and run as pure Python otherwise. Both give **the same results, bit for bit** — the pure-Python sources are the reference and ship alongside the compiled modules.
+- The binary wheels carry the hot modules of the search and the metric's counting kernel compiled (Cython): `lago_modules` runs about 1.4–1.7× faster than pure Python, and repeated scoring of one stream several times faster. Where no binary wheel matches, pip takes the pure-Python wheel; to compile there instead, install from source with a C compiler: `pip install --no-binary dcd-lago dcd-lago` (without one, a source install falls back to pure Python, silently). Both give **the same results, bit for bit** — the pure-Python sources are the reference and ship alongside the compiled modules.
 - `lago_modules` is deterministic: the same input and parameters give the same modules, in any process. `seed` selects the exploration order, `nb_iter` tries several orders and keeps the best, and `n_jobs` runs those in parallel processes (memory and platform notes in the docstring).
 - To see what is running: `lago.accel.core_name()` is `"compiled"` or `"python"`, `lago.accel.backend_name` is `"cython"` or `"python"` for the metric kernel. `LAGO_CORE=python` forces the pure sources. In a checkout, `python setup.py build_ext --inplace` builds the compiled modules next to the sources.
 

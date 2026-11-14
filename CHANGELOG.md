@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.2.1 — unreleased
+
+Same code paths and the same results as 1.2.0, bit for bit; what changes is what you
+can install, and where.
+
+### Packaging
+
+- **No C compiler needed anywhere.** Compiled wheels for CPython 3.11–3.15 on Linux
+  (x86_64 and aarch64, glibc and musl), macOS (Apple Silicon and Intel, no longer
+  macOS 15 only) and Windows (x64 and ARM64). 1.2.0 had wheels for Apple Silicon on
+  macOS 15+ with Python 3.11 and 3.13 only; everyone else built from source, and
+  without a compiler silently got pure Python.
+- **The pure-Python `py3-none-any` wheel is back** (1.2.0 dropped it). pip takes it
+  wherever no binary wheel matches — PyPy, Pyodide, other architectures — so an
+  install never runs a build, and `--only-binary :all:`, offline wheelhouses and
+  Pyodide's micropip work again. To compile on such a platform instead:
+  `pip install --no-binary dcd-lago dcd-lago`.
+- Every distribution is built and tested in CI (`.github/workflows/wheels.yml`) and
+  published through PyPI Trusted Publishing, with PEP 740 attestations linking each
+  file to the commit and workflow that built it. Each binary wheel is tested as
+  installed: every module asserted compiled, and the compiled paths held bit for bit
+  to the pure-Python ones on every platform.
+- Build requirement `Cython>=3.1,<4` (was `>=3.0`, unbounded).
+
+### Safety
+
+- The compiled metric kernel validates its indices: malformed input to the public
+  `lago.accel.count_intra_and_switches` (a label beyond the community count, a short
+  array, an edge or a neighbour outside the arrays) raises `IndexError`, as the
+  pure-Python kernel does, instead of reading or writing out of bounds. About 10 % of
+  the kernel's own time; not measurable on a whole `longitudinal_modularity` call.
+
 ## 1.2.0 — 2026-09-27
 
 Same algorithm, same quality function; a great deal faster, reproducible, and

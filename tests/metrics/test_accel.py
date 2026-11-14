@@ -358,3 +358,84 @@ def test_compiled_kernel_matches_reference(backend: str) -> None:
 
         args = (n, label, indptr, target, weight, left, right, n_communities)
         assert kernel(*args) == _reference_kernel(*args)
+
+
+# =============================================================================
+# Malformed input: an error on every backend, never a stray memory access
+# =============================================================================
+
+_KERNELS = {"python": _reference_kernel} | {
+    name: importlib.import_module(dict(accel._BACKENDS)[name]).count_intra_and_switches
+    for name in _COMPILED
+}
+
+
+def _valid_args() -> list:
+    """Three rows, two communities; row 2's left neighbour is in the other one."""
+    return [
+        3,
+        array("i", [0, 0, 1]),  # label
+        array("q", [0, 1, 2, 3]),  # indptr
+        array("i", [1, 0, 2, 0]),  # target, with the trailing sentinel
+        array("d", [1.0, 1.0, 1.0, 0.0]),  # weight
+        array("i", [-1, -1, 0]),  # left
+        array("i", [-1, -1, -1]),  # right
+        2,  # n_communities
+    ]
+
+
+def _with(position: int, value) -> list:
+    args = _valid_args()
+    args[position] = value
+    return args
+
+
+def _patched(position: int, index: int, value) -> list:
+    args = _valid_args()
+    args[position][index] = value
+    return args
+
+
+MALFORMED = {
+    "label beyond n_communities": _patched(1, 2, 2),
+    "label array shorter than n": _with(1, array("i", [0, 0])),
+    "edge target outside the labels": _patched(3, 0, 3),
+    "edge range beyond the edge arrays": _patched(2, 3, 10),
+    "left row outside the labels": _patched(5, 0, 3),
+    "right row outside the labels": _patched(6, 1, 5),
+}
+
+
+@pytest.mark.parametrize("backend", sorted(_KERNELS))
+def test_kernel_valid_input(backend: str) -> None:
+    assert _KERNELS[backend](*_valid_args()) == ([2.0, 1.0], 1)
+
+
+@pytest.mark.parametrize("backend", sorted(_KERNELS))
+@pytest.mark.parametrize("case", sorted(MALFORMED))
+def test_kernel_rejects_malformed_input(backend: str, case: str) -> None:
+    """The compiled kernel runs without bounds checks, so it validates its indices.
+
+    Each case would read or write outside an array; the reference raises
+    IndexError on all of them, and so must every compiled backend.
+    """
+    args = [arg[:] if isinstance(arg, array) else arg for arg in MALFORMED[case]]
+    with pytest.raises(IndexError):
+        _KERNELS[backend](*args)
+
+
+@pytest.mark.parametrize("backend", _COMPILED)
+def test_compiled_kernel_rejects_negative_target(backend: str) -> None:
+    """Python would wrap a negative index; C would read before the array."""
+    with pytest.raises(IndexError):
+        _KERNELS[backend](*_patched(3, 0, -1))
+
+
+def test_public_wrapper_rejects_out_of_range_labels() -> None:
+    """``lago.accel.count_intra_and_switches`` is public; it gets the same guarantee."""
+    stream = LinkStream()
+    stream.add_links([(0, 1, 0), (1, 2, 1), (0, 2, 1)])
+    topology = build_topology(stream)
+    label = array("i", [5]) * topology.n
+    with pytest.raises(IndexError):
+        accel.count_intra_and_switches(topology, label, 1)

@@ -2,7 +2,7 @@
 
 **Dynamic Community Detection for Temporal Networks**
 
-[![PyPI version](https://badge.fury.io/py/dcd-lago.svg)](https://pypi.org/project/dcd-lago/)
+[![PyPI version](https://img.shields.io/pypi/v/dcd-lago.svg)](https://pypi.org/project/dcd-lago/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/fondationsahar/dynamic_community_detection/blob/main/LICENSE.txt)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
@@ -140,6 +140,7 @@ Against release 1.1.0: 8× (pure Python) to 12× (compiled) on small streams ove
 - [Changelog](https://github.com/fondationsahar/dynamic_community_detection/blob/main/CHANGELOG.md) — What changed in each release
 - [How it works](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/ARCHITECTURE.md) — The implementation, its invariants, the compiled build
 - [Performance](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/PERFORMANCE.md) — What to expect, how it scales, how to measure
+- [Releasing](https://github.com/fondationsahar/dynamic_community_detection/blob/main/docs/RELEASING.md) — How a version reaches PyPI, and what to keep current
 
 📁 **Examples** ([examples/](https://github.com/fondationsahar/dynamic_community_detection/tree/main/examples/))
 - [LinkStream Types](https://github.com/fondationsahar/dynamic_community_detection/blob/main/examples/02_linkstream_types.ipynb) — Weighted, directed, continuous, delayed, k-partite networks

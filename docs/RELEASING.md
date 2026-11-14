@@ -99,6 +99,16 @@ described in `CHANGELOG.md` under `## X.Y.Z — unreleased`.
    docker run --rm python:3.12-slim sh -c "pip install -q --only-binary :all: dcd-lago==X.Y.Z && python -c 'import lago.accel as a; print(a.core_name(), a.backend_name)'"
    ```
 
+9. Optional: the version badge at the top of the README. GitHub serves README images from its
+   own cache, which keeps the shields.io badge up to 6 hours, so the repository page can show
+   the previous version for a while after PyPI has the new one. To make GitHub fetch it again
+   now:
+   ```bash
+   curl -s https://github.com/fondationsahar/dynamic_community_detection | grep -oE 'https://camo\.githubusercontent\.com/[0-9a-f]+/68747470733a2f2f696d672e736869656c64732e696f2f707970692f762f6463642d6c61676f2e737667' | head -1 | xargs curl -X PURGE
+   ```
+   The long hexadecimal part is the badge's URL (`https://img.shields.io/pypi/v/dcd-lago.svg`)
+   encoded, which is how GitHub names its cached copy. Reload the page afterwards (Cmd+Shift+R).
+
 ## When a release run fails
 
 - **A build or test job failed.** Nothing was published: the publish job only runs once all of

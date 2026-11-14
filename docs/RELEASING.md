@@ -135,8 +135,10 @@ described in `CHANGELOG.md` under `## X.Y.Z — unreleased`.
 ## Keeping it current
 
 - **A new CPython every October.** Add `"cp3NN-*"` to `build` in `[tool.cibuildwheel]`, add the
-  classifier in `[project]`, and update cibuildwheel (and Cython, if needed) to versions that
-  support it. The free-threaded skip pattern `cp31?t-*` covers versions 3.10–3.19.
+  classifier in `[project]` (the README's Python badge reads the classifiers from PyPI, so it
+  follows on its own once the release is out), and update cibuildwheel (and Cython, if
+  needed) to versions that support it. The free-threaded skip pattern `cp31?t-*` covers
+  versions 3.10–3.19.
 - **The pinned actions.** Each `uses:` line in the workflow pins a commit, with its version in a
   comment. To update one, take the commit of the new tag. For an annotated tag, that is the
   `^{}` line:

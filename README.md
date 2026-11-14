@@ -4,7 +4,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/dcd-lago.svg)](https://pypi.org/project/dcd-lago/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/fondationsahar/dynamic_community_detection/blob/main/LICENSE.txt)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python versions](https://img.shields.io/pypi/pyversions/dcd-lago.svg)](https://www.python.org/downloads/)
 
 Community detection reveals the hidden structure of a network — groups that interact more among themselves than with the rest — and turns a network too large to read into a small set of groups that can be. LAGO does this for temporal networks (link streams): it finds communities that form, merge, split and dissolve as interactions happen.
 
